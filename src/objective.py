@@ -12,7 +12,6 @@ So I invented the wheel a little bit rounder - at least for me.
 The plan is to declarativly build a structure which has to be instanciated for examination.
 
 
-
 """
 
 
@@ -144,7 +143,7 @@ class Node(object):
     # stores all children items, collected by __new__
     _children = {}
 
-    # the item this node is created by
+    # the item this node was created by
     _item = None
 
     @property
@@ -185,7 +184,7 @@ class Node(object):
 
 
 # validator specific section
-class Undefined(object):
+class Undefined(object):        # pylint: disable=R0903
 
     """Describes a value, which was not defined. So this is different from ``None``."""
 
@@ -235,7 +234,7 @@ class InvalidChildren(Invalid):
             yield child.node._name, child
 
 
-class InvalidType(Invalid):
+class InvalidValue(Invalid):
 
     """Raised when a type is not as expected."""
 
@@ -275,7 +274,7 @@ class Missing(object):
 
         raise MissingValue(self.node,
                            value=value,
-                           msg="Value for {0} is missing!".format(self.node._name))
+                           msg="Value for `{0}` is missing!".format(self.node._name))
 
 
 class Ignore(Missing):
@@ -315,13 +314,10 @@ class Field(Node):
 
         return value
 
-    def deserialize(self, value, environment=None):
-        """Deserialize a value into a special application specific format or type.
+    def resolve_value(self, value, environment=None):
+        """Resolve the value.
 
-        ``value`` can be ``Missing``, ``None`` or something else.
-
-        :param value: the value to be deserialized
-        :param environment: additional environment
+        Either apply missing or leave the value as is.
         """
 
         if isinstance(value, Undefined):
@@ -335,6 +331,20 @@ class Field(Node):
                 # we just assign any value
                 value = self.missing
 
+        return value
+
+    def deserialize(self, value, environment=None):
+        """Deserialize a value into a special application specific format or type.
+
+        ``value`` can be ``Missing``, ``None`` or something else.
+
+        :param value: the value to be deserialized
+        :param environment: additional environment
+        """
+        value = self.resolve_value(value, environment)
+
+        # validate after we resolved the value
+        # TODO find out if we need to validate also the missing value
         if callable(self.validator):
             validated = self.validator(value, environment or {})
 
@@ -344,6 +354,7 @@ class Field(Node):
         return value
 
 
+# fields section
 class Mapping(Field):
 
     """A ``Mapping`` resembles a dict like structure."""
@@ -366,6 +377,7 @@ class Mapping(Field):
         :param value: a ``dict`` wich contains mapped values
         """
 
+        # TODO make dict type an option
         mapping = {}
 
         invalids = []
@@ -392,158 +404,36 @@ class Mapping(Field):
         return mapping
 
 
-# this is the test section
-import pytest
+class Number(Field):
+
+    """Represents a numeric value ``float`` or ``int``."""
+
+    types = (int, float)
+
+    def resolve_value(self, value, environment=None):
+        value = super(Number, self).resolve_value(value, environment)
+
+        for _type in self.types:
+            try:
+                casted = _type(value)
+                return casted
+
+            except ValueError:      # pylint: disable=W0704
+                pass
+
+        raise InvalidValue(self, "Invalid value `{value}` for `{types}`"
+                           .format(value=value, types=self.types), value)
 
 
-class TestValidator(object):
+class Float(Number):
 
-    def test_validate(self):
-        v = Validator()
+    """Represents a ``float`` value."""
 
-        assert v('foo') == 'foo'
-
-
-class TestFields(object):
-
-    def test_schema(self):
-        class S(Node):
-            foo = Item(Field)
-
-        assert isinstance(S.foo, Item)
-
-        s = S()
-
-        assert isinstance(s.foo, Node)
-        assert isinstance(s.foo, Field)
-
-    def test_mapping(self):
-
-        class M(Mapping):
-            foo = Item(Field)
-            bar = Item(Field)
-            bam = Item(Field, missing=Ignore)
-            fom = Item(Field, missing='default')
-
-        m = M()
-
-        result = m.deserialize({
-            'foo': 'foo',
-            'bar': 'bar',
-            'baz': 'baz'    # this should be ignored
-        })
-
-        assert result == {
-            'foo': 'foo',
-            'bar': 'bar',
-            'fom': 'default'
-        }
-
-    def test_mapping_missing(self):
-
-        class M(Mapping):
-            foo = Item(Field, missing='1')
-            bar = Item(Field)
-
-            @Item()
-            class bam(Mapping):
-
-                foo = Item(Field)
-                fom = Item(Field, missing='default')
-
-        m = M(name='m')
-
-        with pytest.raises(Invalid) as ex:
-            m.deserialize({'bam': {}})
-
-        assert isinstance(ex.value, InvalidChildren)
-        assert ex.value.children[0].node == m.bam
-        assert ex.value.children[0].children[0].node == m.bam.foo
-        assert ex.value.children[1].node == m.bar
+    types = (float,)
 
 
-class TestNode(object):
+class Int(Number):
 
-    def test_schema(self):
+    """Represents an ``int`` value."""
 
-        class Schema(Node):
-
-            foo = Item(Node)
-            _bar = Item(Node, name='bar')
-
-            @Item(name='sub')
-            class _sub(Node):
-                fom = Item(Node)
-
-        s = Schema()
-
-        assert isinstance(s, Node)
-        assert isinstance(s.foo, Node)
-        assert isinstance(s._bar, Node)
-        assert isinstance(s._sub, Node)
-        assert isinstance(s._sub.fom, Node)
-        assert isinstance(Schema.foo, Item)
-
-    def test_name(self):
-        class S(Node):
-
-            foo = Item(Node)
-            bar = Item(Node, name='BAR')
-
-        s = S()
-
-        assert s.foo._name == 'foo'
-        assert s.bar._name == 'BAR'
-
-    def test_iter(self):
-        class S(Node):
-            foo = Item(Node)
-            bar = Item(Node)
-
-        s = S()
-
-        items = list(s)
-
-        assert ('foo', s.foo) in items
-        assert ('bar', s.bar) in items
-
-    def test_inheritance(self):
-
-        class S1(Node):
-            foo = Item(Node)
-
-        class S2(S1):
-            bar = Item(Node)
-
-        class S3(Node):
-            bam = Item(Node)
-
-        class S4(S2, S3):
-            bar = Item(Node)
-
-        assert 'foo' in S4._children
-        assert 'bar' in S4._children
-
-    def test_getitem(self):
-
-        class S1(Node):
-            foo = Item(Node)
-
-            @Item(name='bam')
-            class bar(Node):
-                baz = Item(Node)
-                bim = Item(Node)
-
-        s = S1()
-
-        assert isinstance(s['foo'], Node)
-        assert isinstance(s['bam'], Node)
-        assert isinstance(s['bam']['baz'], Node)
-
-        # test id
-        assert id(s['foo']) == id(s['foo'])
-
-        with pytest.raises(KeyError) as ex:
-            s['bam']['missing']
-
-        assert ex.value.message == '`missing` not in <bar: baz, bim>'
+    types = (int,)

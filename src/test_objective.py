@@ -50,6 +50,35 @@ class TestFields(object):
             'fom': 'default'
         }
 
+    def test_nested_mapping(self):
+        import objective
+
+        class M(objective.Mapping):
+            foo = objective.Item(objective.Field)
+            bam = objective.Item(objective.Field, missing=objective.Ignore)
+
+            @objective.Item()
+            class baz(objective.Mapping):
+                foo = objective.Item(objective.Field)
+                bam = objective.Item(objective.Field, missing="bar")
+
+        m = M()
+
+        result = m.deserialize({
+            'foo': 123,
+            'baz': {
+                'foo': 'bar'
+            }
+        })
+
+        assert result == {
+            'foo': 123,
+            'baz': {
+                'foo': 'bar',
+                'bam': 'bar'
+            }
+        }
+
     def test_mapping_missing(self):
         import objective
 
@@ -72,6 +101,53 @@ class TestFields(object):
         assert ex.value.children[0].node == m.bam
         assert ex.value.children[0].children[0].node == m.bam.foo
         assert ex.value.children[1].node == m.bar
+
+
+class TestNumber(object):
+    def test_number_int(self):
+        import objective
+
+        n = objective.Number().deserialize("123")
+        assert n == 123
+
+    def test_number_float(self):
+        import objective
+
+        n = objective.Number().deserialize("123.456")
+        assert n == 123.456
+
+    def test_number_mapping(self):
+        import objective
+
+        class M(objective.Mapping):
+            n = objective.Item(objective.Number)
+            m = objective.Item(objective.Number, missing="456")
+
+        m = M()
+
+        assert m.deserialize({'n': "123"}) == {'n': 123, 'm': 456}
+        assert m.deserialize({'n': "123", 'm': "123.456"}) == {'n': 123, 'm': 123.456}
+
+    def test_number_mapping_invalid(self):
+        import objective
+
+        class M(objective.Mapping):
+            n = objective.Item(objective.Number)
+            m = objective.Item(objective.Number, missing="456")
+
+        m = M()
+
+        with pytest.raises(objective.Invalid) as ex:
+            m.deserialize({'n': "foo"})
+
+        assert isinstance(ex.value, objective.InvalidChildren)
+        assert ex.value.children[0].node == m.n
+
+    def test_number_invalid(self):
+        import objective
+
+        with pytest.raises(objective.InvalidValue):
+            objective.Number().deserialize("foo")
 
 
 class TestNode(object):
@@ -141,6 +217,7 @@ class TestNode(object):
 
         assert 'foo' in S4._children
         assert 'bar' in S4._children
+        assert 'bam' in S4._children
 
     def test_getitem(self):
         import objective
@@ -163,6 +240,6 @@ class TestNode(object):
         assert id(s['foo']) == id(s['foo'])
 
         with pytest.raises(KeyError) as ex:
-            s['bam']['missing']
+            s['bam']['missing']         # pylint: disable=W0104
 
         assert ex.value.message == '`missing` not in <bar: baz, bim>'
