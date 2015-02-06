@@ -13,6 +13,7 @@ The plan is to declarativly build a structure which has to be instanciated for e
 
 
 """
+import functools
 
 
 class Item(object):
@@ -158,21 +159,23 @@ class Node(object):
 
         raise KeyError("`{}` not in {}".format(name, self))
 
-    def __repr__(self):
-        """Represent a Node."""
+    def __contains__(self, name):
+        return name in self._children
 
-        return "<{n.__class__.__name__}: {items}>"\
-            .format(
-                n=self, items=', '.join(sorted(self._children))
-            )
+    def get(self, name, default=None):
+        if name in self:
+            return self[name]
+
+        return default
 
     def __iter__(self):
         """Iterates over all items and returns appropriate nodes."""
-        return iter(self.iteritems())
 
-    def iteritems(self):
         for name in self._children:
             yield name, getattr(self, name)
+
+    def iteritems(self):
+        return iter(self)
 
     def itervalues(self):
         for name in self._children:
@@ -181,6 +184,14 @@ class Node(object):
     def iterkeys(self):
         for name in self._children:
             yield name
+
+    def __repr__(self):
+        """Represent a Node."""
+
+        return "<{n.__class__.__name__}: {items}>"\
+            .format(
+                n=self, items=', '.join(sorted(self._children))
+            )
 
 
 # validator specific section
@@ -285,6 +296,24 @@ class Ignore(Missing):
         raise IgnoreValue("Ignore `{}`.".format(self.node._name))
 
 
+def validate(meth):
+    """Decorate a deserialize function with a validator."""
+
+    @functools.wraps(meth)
+    def wrapper(self, value, **environment):
+        # get validated value from supers
+        value = meth(self, value, **environment)
+
+        # validate after we resolved the value
+        # TODO find out if we need to validate also the missing value
+        if callable(self.validator):
+            value = self.validator(value, **environment)
+
+        return value
+
+    return wrapper
+
+
 class Field(Node):
 
     """A ``Field`` describes the value of a ``Node``.
@@ -294,6 +323,7 @@ class Field(Node):
     An optional validator sanitizes the value before deserializing it.
     """
 
+    # TODO think about making this private by _
     validator = None
 
     def __init__(self, validator=None, **kwargs):
@@ -306,6 +336,7 @@ class Field(Node):
         if callable(validator):
             self.validator = validator
 
+        # TODO think about making this private by _
         self.missing = kwargs.get('missing', Missing)
 
     def serialize(self, value):
@@ -333,7 +364,8 @@ class Field(Node):
 
         return value
 
-    def deserialize(self, value, environment=None):
+    @validate
+    def deserialize(self, value, **environment):
         """Deserialize a value into a special application specific format or type.
 
         ``value`` can be ``Missing``, ``None`` or something else.
@@ -341,37 +373,65 @@ class Field(Node):
         :param value: the value to be deserialized
         :param environment: additional environment
         """
-        value = self.resolve_value(value, environment)
+        value = self.resolve_value(value, **environment)
 
-        # validate after we resolved the value
-        # TODO find out if we need to validate also the missing value
-        if callable(self.validator):
-            validated = self.validator(value, environment or {})
-
-            return validated
-
-        # we just return the value as is
         return value
 
 
 # fields section
-class Mapping(Field):
+class Collection(Field):
 
-    """A ``Mapping`` resembles a dict like structure."""
-
-    def deserialize(self, value, environment=None):
+    @validate
+    def deserialize(self, value, **environment):
+        """A collection traverses over something to deserialize its value."""
 
         # first invoke super validation
-        validated = super(Mapping, self).deserialize(
-            value, environment=environment
+        validated = super(Collection, self).deserialize(
+            value, **environment
         )
 
         # traverse items and match against validated struct
-        mapping = self.traverse_children(validated, environment)
+        collection = self.traverse_children(validated, **environment)
 
-        return mapping
+        return collection
 
-    def traverse_children(self, value, environment):
+    def traverse_children(self, value, **environment):
+        """We traverse over all the value items and collect them."""
+
+        # our first child defines the items
+        items = self.get('items', Field())
+
+        collection = [items.deserialize(item) for item in value]
+
+        return collection
+
+
+class Set(Collection):
+
+    def __new__(cls, items=None, **kwargs):
+        inst = Collection.__new__(cls, items=items, **kwargs)
+
+        # inject items only for the instance if it is defined
+        if items is not None:
+            inst.__dict__['items'] = items.__get__(inst, cls)
+        return inst
+
+    def traverse_children(self, value, **environment):
+        # our first child defines the items
+        items = self.get('items', getattr(self, 'items', Field()))
+        # TODO check out Invalid bubbling
+        collection = {items.deserialize(item) for item in value}
+
+        return collection
+
+
+class Mapping(Collection):
+
+    """A ``Mapping`` resembles a dict like structure."""
+
+    # TODO validator must check for callable(value.get)
+
+    def traverse_children(self, value, **environment):
         """Traverse over all defined items and return a dictionary.
 
         :param value: a ``dict`` wich contains mapped values
@@ -382,11 +442,11 @@ class Mapping(Field):
 
         invalids = []
 
-        for name, item in self.iteritems():
+        for name, item in self:
             # deserialize each item
             try:
                 mapping[name] = item.deserialize(
-                    value.get(name, Undefined()), environment=environment
+                    value.get(name, Undefined()), **environment
                 )
 
             except IgnoreValue:
@@ -410,8 +470,8 @@ class Number(Field):
 
     types = (int, float)
 
-    def resolve_value(self, value, environment=None):
-        value = super(Number, self).resolve_value(value, environment)
+    def resolve_value(self, value, **environment):
+        value = super(Number, self).resolve_value(value, **environment)
 
         for _type in self.types:
             try:
@@ -437,3 +497,25 @@ class Int(Number):
     """Represents an ``int`` value."""
 
     types = (int,)
+
+
+class Unicode(Field):
+
+    """Represents a text string."""
+
+    encoding = "utf-8"
+
+    def resolve_value(self, value, **environment):
+        value = super(Unicode, self).resolve_value(value, **environment)
+
+        # ensure we have a unicode afterwards
+        if isinstance(value, unicode):
+            pass
+
+        elif isinstance(value, str):
+            value = unicode(value, self.encoding)
+
+        else:
+            value = unicode(value)
+
+        return value

@@ -1,3 +1,4 @@
+# coding: utf-8
 # this is the test section
 import pytest
 
@@ -148,6 +149,46 @@ class TestNumber(object):
 
         with pytest.raises(objective.InvalidValue):
             objective.Number().deserialize("foo")
+
+
+class TestCollection(object):
+    def test_list(self):
+        import objective
+
+        result = objective.Collection().deserialize([1, 2, 3])
+
+        assert result == [1, 2, 3]
+
+    def test_set_pure(self):
+        import objective
+
+        result = objective.Set().deserialize([1, 2, 3])
+
+        assert result == {1, 2, 3}
+
+    def test_set_unicode(self):
+        import objective
+
+        class C(objective.Set):
+            items = objective.Item(objective.Unicode)
+
+        result = C().deserialize([1, "ä", 3])
+        assert result == {u'1', u'\xe4', u'3'}
+
+        result = objective.Set(items=objective.Item(objective.Unicode)).deserialize([1, "ä", 3])
+        assert result == {u'1', u'\xe4', u'3'}
+
+    def test_list_in_mapping(self):
+        import objective
+
+        class M(objective.Mapping):
+            tags = objective.Item(objective.Collection, items=objective.Field)
+
+        m = M()
+
+        result = m.deserialize({"tags": [1, 2, 3]})
+
+        assert result == {"tags": [1, 2, 3]}
 
 
 class TestNode(object):
