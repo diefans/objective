@@ -151,11 +151,11 @@ class TestNumber(object):
             objective.Number().deserialize("foo")
 
 
-class TestCollection(object):
+class TestList(object):
     def test_list(self):
         import objective
 
-        result = objective.Collection().deserialize([1, 2, 3])
+        result = objective.List().deserialize([1, 2, 3])
 
         assert result == [1, 2, 3]
 
@@ -178,17 +178,47 @@ class TestCollection(object):
         result = objective.Set(items=objective.Item(objective.Unicode)).deserialize([1, "ä", 3])
         assert result == {u'1', u'\xe4', u'3'}
 
-    def test_list_in_mapping(self):
+    def test_list_in_mapping1(self):
         import objective
 
         class M(objective.Mapping):
-            tags = objective.Item(objective.Collection, items=objective.Field)
+            @objective.Item()
+            class tags(objective.List):
+                items = objective.Item(objective.Field)
 
         m = M()
 
         result = m.deserialize({"tags": [1, 2, 3]})
 
         assert result == {"tags": [1, 2, 3]}
+
+    def test_list_in_mapping2(self):
+        import objective
+
+        class M(objective.Mapping):
+            tags = objective.Item(objective.List, items=objective.Item(objective.Field))
+
+        m = M()
+
+        result = m.deserialize({"tags": [1, 2, 3]})
+
+        assert result == {"tags": [1, 2, 3]}
+
+
+class TestDateTime(object):
+
+    @pytest.mark.parametrize("ds", [
+        "2014-05-07T14:19:09.522Z",
+        "2014-05-07 14:19:09.522000+00:00",
+        1399472349.522,
+    ])
+    def test_deserialize(self, ds):
+        import objective
+
+        result = objective.dateutil_parse("2014-05-07T14:19:09.522Z")
+        f = objective.UtcDateTime()
+
+        assert f.deserialize(ds) == result
 
 
 class TestNode(object):

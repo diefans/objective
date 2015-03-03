@@ -11,6 +11,7 @@ So I invented the wheel a little bit rounder - at least for me.
 
 The plan is to declarativly build a structure which has to be instanciated for examination.
 
+Basic assumtion is that serialization format is a JSON like representation of data.
 
 """
 import functools
@@ -337,18 +338,16 @@ class Field(Node):
             self.validator = validator
 
         # TODO think about making this private by _
+        # this is intentionally in kwargs, so we can also apply ``None`` for missing
         self.missing = kwargs.get('missing', Missing)
-
-    def serialize(self, value):
-        """Serialze a value into a transportable and interchangeable format."""
-        # TODO
-
-        return value
 
     def resolve_value(self, value, environment=None):
         """Resolve the value.
 
         Either apply missing or leave the value as is.
+
+        :param value: the value either from deserialize or serialize
+        :param environment: an optional environment
         """
 
         if isinstance(value, Undefined):
@@ -361,6 +360,12 @@ class Field(Node):
             else:
                 # we just assign any value
                 value = self.missing
+
+        return value
+
+    def serialize(self, value):
+        """Serialze a value into a transportable and interchangeable format."""
+        # TODO
 
         return value
 
@@ -379,14 +384,71 @@ class Field(Node):
 
 
 # fields section
-class Collection(Field):
+
+class ListMixin(object):
+    def __new__(cls, items=None, **kwargs):
+        inst = Field.__new__(cls, items=items, **kwargs)
+
+        # inject items only for the instance if it is defined
+        if items is not None:
+            print "new items", items, type(items)
+            inst.__dict__['items'] = items.__get__(inst, cls)
+        return inst
+
+    def traverse_children(self, value, **environment):
+        # our first child defines the items
+        items_attr = getattr(self, 'items', None)
+
+        print "items attr", items_attr, type(items_attr)
+
+        items = self.get('items', getattr(self, 'items', Field()))
+
+        print "items", items, type(items)
+        for item in value:
+            yield items.deserialize(item)
+
+
+class Set(Field, ListMixin):
 
     @validate
     def deserialize(self, value, **environment):
         """A collection traverses over something to deserialize its value."""
 
         # first invoke super validation
-        validated = super(Collection, self).deserialize(
+        validated = super(Set, self).deserialize(value, **environment)
+
+        # traverse items and match against validated struct
+        collection = {item for item in self.traverse_children(validated, **environment)}
+
+        return collection
+
+
+class List(Field, ListMixin):
+
+    @validate
+    def deserialize(self, value, **environment):
+        """A collection traverses over something to deserialize its value."""
+
+        # first invoke super validation
+        validated = super(List, self).deserialize(value, **environment)
+
+        # traverse items and match against validated struct
+        collection = [item for item in self.traverse_children(validated, **environment)]
+
+        return collection
+
+
+class Mapping(Field):
+
+    """A ``Mapping`` resembles a dict like structure."""
+
+    # TODO validator must check for callable(value.get)
+    @validate
+    def deserialize(self, value, **environment):
+        """A collection traverses over something to deserialize its value."""
+
+        # first invoke super validation
+        validated = super(Mapping, self).deserialize(
             value, **environment
         )
 
@@ -394,42 +456,6 @@ class Collection(Field):
         collection = self.traverse_children(validated, **environment)
 
         return collection
-
-    def traverse_children(self, value, **environment):
-        """We traverse over all the value items and collect them."""
-
-        # our first child defines the items
-        items = self.get('items', Field())
-
-        collection = [items.deserialize(item) for item in value]
-
-        return collection
-
-
-class Set(Collection):
-
-    def __new__(cls, items=None, **kwargs):
-        inst = Collection.__new__(cls, items=items, **kwargs)
-
-        # inject items only for the instance if it is defined
-        if items is not None:
-            inst.__dict__['items'] = items.__get__(inst, cls)
-        return inst
-
-    def traverse_children(self, value, **environment):
-        # our first child defines the items
-        items = self.get('items', getattr(self, 'items', Field()))
-        # TODO check out Invalid bubbling
-        collection = {items.deserialize(item) for item in value}
-
-        return collection
-
-
-class Mapping(Collection):
-
-    """A ``Mapping`` resembles a dict like structure."""
-
-    # TODO validator must check for callable(value.get)
 
     def traverse_children(self, value, **environment):
         """Traverse over all defined items and return a dictionary.
@@ -470,8 +496,8 @@ class Number(Field):
 
     types = (int, float)
 
-    def resolve_value(self, value, **environment):
-        value = super(Number, self).resolve_value(value, **environment)
+    def deserialize(self, value, **environment):
+        value = super(Number, self).deserialize(value, **environment)
 
         for _type in self.types:
             try:
@@ -505,8 +531,8 @@ class Unicode(Field):
 
     encoding = "utf-8"
 
-    def resolve_value(self, value, **environment):
-        value = super(Unicode, self).resolve_value(value, **environment)
+    def deserialize(self, value, **environment):
+        value = super(Unicode, self).deserialize(value, **environment)
 
         # ensure we have a unicode afterwards
         if isinstance(value, unicode):
@@ -519,3 +545,38 @@ class Unicode(Field):
             value = unicode(value)
 
         return value
+
+    def serialize(self, value, *environment):
+        return value.encode(self.encoding)
+
+
+from datetime import datetime
+from dateutil.parser import parse as dateutil_parse
+from dateutil.tz import tzutc
+import pytz
+
+
+def totimestamp(dt, epoch=datetime(1970, 1, 1, tzinfo=pytz.utc)):
+    td = dt - epoch
+    # return td.total_seconds()
+    return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 1e6
+
+
+class UtcDateTime(Field):
+
+    """Represents a datetime string in UTC."""
+
+    def deserialize(self, value, **environment):
+        value = super(UtcDateTime, self).deserialize(value, **environment)
+
+        # test for a timestamp
+        if isinstance(value, basestring):
+            # try utc datetime string
+            return dateutil_parse(value)
+
+        elif isinstance(value, (int, float)):
+            dt = datetime.utcfromtimestamp(value)
+            return pytz.utc.localize(dt)
+
+    def serialize(self, value, **environment):
+        return str(value)
