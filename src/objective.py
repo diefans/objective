@@ -263,7 +263,7 @@ class IgnoreValue(UndefinedValue):
 
 class Validator(object):
 
-    def __call__(self, value, environment=None):
+    def __call__(self, value, **environment):
         """Perform value validation.
 
         Should raise ``Invalid`` if something seems wrong.
@@ -277,9 +277,9 @@ class Missing(object):
 
     """Defines an action to be peformed when the value is missing."""
 
-    def __init__(self, node, environment=None):
+    def __init__(self, node, **environment):
         self.node = node
-        self.environment = environment or {}
+        self.environment = environment
 
     def __call__(self, value):
         """Just raise a ``MissingValue`` exception."""
@@ -341,7 +341,7 @@ class Field(Node):
         # this is intentionally in kwargs, so we can also apply ``None`` for missing
         self.missing = kwargs.get('missing', Missing)
 
-    def resolve_value(self, value, environment=None):
+    def resolve_value(self, value, **environment):
         """Resolve the value.
 
         Either apply missing or leave the value as is.
@@ -352,9 +352,11 @@ class Field(Node):
 
         if isinstance(value, Undefined):
             if isinstance(self.missing, type) and issubclass(self.missing, Missing):
-                missing = self.missing(self, environment)
+                # instantiate the missing thing
+                missing = self.missing(self, **environment)
 
                 # invoke missing callback
+                # the default is to raise a MissingValue() exception
                 value = missing(value)
 
             else:
@@ -451,6 +453,15 @@ class Mapping(Field):
         for name, item in self:
             yield name, item
 
+    def serialize(self, value, **environment):
+
+        serialized = super(Mapping, self).serialize(value, **environment)
+
+        return {
+            name: item.serialize(value.get(name, Undefined()), **environment)
+            for name, item in self.traverse_children(value, **environment)
+        }
+
     @validate
     def deserialize(self, value, **environment):
         """A collection traverses over something to deserialize its value.
@@ -545,7 +556,7 @@ class Unicode(Field):
 
         return value
 
-    def serialize(self, value, *environment):
+    def serialize(self, value, **environment):
         return value.encode(self.encoding)
 
 

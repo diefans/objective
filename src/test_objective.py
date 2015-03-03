@@ -205,6 +205,35 @@ class TestList(object):
         assert result == {"tags": [u"1", u"2", u"3"]}
 
 
+def test_serialize():
+    import objective
+
+    dct = {
+        'foo': {
+            'bar': {1, 2, 3},
+            'baz': [{'x': 1}, {'x': 2}],
+            'omit': "foobar"
+        }
+    }
+
+    class M(objective.Mapping):
+        @objective.Item()
+        class foo(objective.Mapping):
+            @objective.Item()
+            class bar(objective.List):
+                items = objective.Item(objective.Unicode)
+
+            @objective.Item()
+            class baz(objective.Set):
+                @objective.Item()
+                class items(objective.Mapping):
+                    x = objective.Item(objective.Number)
+
+    m = M()
+
+    assert m.serialize(dct) == {'foo': {'bar': set([1, 2, 3]), 'baz': [{'x': 1}, {'x': 2}]}}
+
+
 class TestDateTime(object):
 
     @pytest.mark.parametrize("ds", [
