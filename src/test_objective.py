@@ -184,25 +184,25 @@ class TestList(object):
         class M(objective.Mapping):
             @objective.Item()
             class tags(objective.List):
-                items = objective.Item(objective.Field)
+                items = objective.Item(objective.Unicode)
 
         m = M()
 
         result = m.deserialize({"tags": [1, 2, 3]})
 
-        assert result == {"tags": [1, 2, 3]}
+        assert result == {"tags": [u"1", u"2", u"3"]}
 
     def test_list_in_mapping2(self):
         import objective
 
         class M(objective.Mapping):
-            tags = objective.Item(objective.List, items=objective.Item(objective.Field))
+            tags = objective.Item(objective.List, items=objective.Item(objective.Unicode))
 
         m = M()
 
         result = m.deserialize({"tags": [1, 2, 3]})
 
-        assert result == {"tags": [1, 2, 3]}
+        assert result == {"tags": [u"1", u"2", u"3"]}
 
 
 class TestDateTime(object):

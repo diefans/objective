@@ -364,8 +364,15 @@ class Field(Node):
         return value
 
     def serialize(self, value):
-        """Serialze a value into a transportable and interchangeable format."""
-        # TODO
+        """Serialze a value into a transportable and interchangeable format.
+
+        The default assumption is that the value is JSON e.g. string or number.
+        Some encoders also support datetime by default.
+
+        Serialization should not be validated, since the developer app would be
+        bounced, since the mistake comes from there - use unittests for this!
+
+        """
 
         return value
 
@@ -386,6 +393,8 @@ class Field(Node):
 # fields section
 
 class ListMixin(object):
+    items = Item(Field)
+
     def __new__(cls, items=None, **kwargs):
         inst = Field.__new__(cls, items=items, **kwargs)
 
@@ -395,9 +404,8 @@ class ListMixin(object):
         return inst
 
     def traverse_children(self, value, **environment):
-        # our first child defines the items
-        items_attr = getattr(self, 'items', Field())
-        items = self.get('items', items_attr)
+        # items must be defined
+        items = getattr(self, 'items')
 
         for item in value:
             yield items.deserialize(item)
@@ -437,33 +445,29 @@ class Mapping(Field):
 
     """A ``Mapping`` resembles a dict like structure."""
 
-    # TODO validator must check for callable(value.get)
+    def traverse_children(self, value, **environment):
+        """Traverse over all defined items and return a dictionary."""
+
+        for name, item in self:
+            yield name, item
+
     @validate
     def deserialize(self, value, **environment):
-        """A collection traverses over something to deserialize its value."""
-
-        # first invoke super validation
-        validated = super(Mapping, self).deserialize(
-            value, **environment
-        )
-
-        # traverse items and match against validated struct
-        collection = self.traverse_children(validated, **environment)
-
-        return collection
-
-    def traverse_children(self, value, **environment):
-        """Traverse over all defined items and return a dictionary.
+        """A collection traverses over something to deserialize its value.
 
         :param value: a ``dict`` wich contains mapped values
         """
 
-        # TODO make dict type an option
+        # first invoke super validation
+        validated = super(Mapping, self).deserialize(value, **environment)
+
+        # traverse items and match against validated struct
         mapping = {}
 
         invalids = []
 
-        for name, item in self:
+        for name, item in self.traverse_children(validated, **environment):
+
             # deserialize each item
             try:
                 mapping[name] = item.deserialize(
