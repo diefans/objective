@@ -234,6 +234,23 @@ def test_serialize():
     assert m.serialize(dct) == {'foo': {'bar': set([1, 2, 3]), 'baz': [{'x': 1}, {'x': 2}]}}
 
 
+def test_serialize_missing():
+    import objective
+
+    dct = {"foo": 123}
+
+    class M(objective.Mapping):
+        foo = objective.Item(objective.Field)
+        bar = objective.Item(objective.Field)
+
+    m = M()
+    with pytest.raises(objective.InvalidChildren) as e:
+        m.serialize(dct)
+
+    assert e.value.children[0].node._name == 'bar'
+    assert isinstance(e.value.children[0].value, objective.Undefined)
+
+
 class TestDateTime(object):
 
     @pytest.mark.parametrize("ds", [

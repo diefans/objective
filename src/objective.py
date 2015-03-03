@@ -350,6 +350,7 @@ class Field(Node):
         :param environment: an optional environment
         """
 
+        # here we care about Undefined values
         if isinstance(value, Undefined):
             if isinstance(self.missing, type) and issubclass(self.missing, Missing):
                 # instantiate the missing thing
@@ -365,7 +366,7 @@ class Field(Node):
 
         return value
 
-    def serialize(self, value):
+    def serialize(self, value, **environment):
         """Serialze a value into a transportable and interchangeable format.
 
         The default assumption is that the value is JSON e.g. string or number.
@@ -375,6 +376,7 @@ class Field(Node):
         bounced, since the mistake comes from there - use unittests for this!
 
         """
+        value = self.resolve_value(value, **environment)
 
         return value
 
@@ -456,6 +458,32 @@ class Mapping(Field):
     def serialize(self, value, **environment):
 
         serialized = super(Mapping, self).serialize(value, **environment)
+
+        mapping = {}
+
+        invalids = []
+
+        for name, item in self.traverse_children(serialized, **environment):
+
+            # deserialize each item
+            try:
+                mapping[name] = item.serialize(
+                    serialized.get(name, Undefined()), **environment
+                )
+
+            except IgnoreValue:
+                # just ignore this value
+                pass
+
+            except Invalid as ex:
+                # append this to the list of invalids, so we can return a complete overview of errors
+                invalids.append(ex)
+
+        if invalids:
+            # on invalids this item is also ``Invalid``
+            raise InvalidChildren(self, invalids)
+
+        return mapping
 
         return {
             name: item.serialize(value.get(name, Undefined()), **environment)
