@@ -391,19 +391,14 @@ class ListMixin(object):
 
         # inject items only for the instance if it is defined
         if items is not None:
-            print "new items", items, type(items)
             inst.__dict__['items'] = items.__get__(inst, cls)
         return inst
 
     def traverse_children(self, value, **environment):
         # our first child defines the items
-        items_attr = getattr(self, 'items', None)
+        items_attr = getattr(self, 'items', Field())
+        items = self.get('items', items_attr)
 
-        print "items attr", items_attr, type(items_attr)
-
-        items = self.get('items', getattr(self, 'items', Field()))
-
-        print "items", items, type(items)
         for item in value:
             yield items.deserialize(item)
 
