@@ -360,6 +360,9 @@ class Field(Node):
                 # the default is to raise a MissingValue() exception
                 value = missing(value)
 
+            elif callable(self.missing):
+                value = self.missing()
+
             else:
                 # we just assign any value
                 value = self.missing
