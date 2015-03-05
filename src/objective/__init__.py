@@ -619,5 +619,10 @@ class UtcDateTime(Field):
             dt = datetime.utcfromtimestamp(value)
             return pytz.utc.localize(dt)
 
+        elif isinstance(value, datetime):
+            return value
+
+        raise InvalidValue(self, "Invalid DateTime", value)
+
     def serialize(self, value, **environment):
         return str(value)
