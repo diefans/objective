@@ -30,7 +30,7 @@ class PyTest(TestCommand):
 
 setup(
     name="objective",
-    version="0.0.1",
+    version="0.0.2",
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,

@@ -214,7 +214,7 @@ class Invalid(Exception):
     """Raised when a validator failed."""
 
     def __init__(self, node, msg=None, value=Undefined(), *args, **kwargs):
-        super(Invalid, self).__init__(*args)
+        super(Invalid, self).__init__(node, msg, value, *args)
 
         self.node = node
         self.value = value
