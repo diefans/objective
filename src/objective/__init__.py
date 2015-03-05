@@ -588,6 +588,7 @@ class Unicode(Field):
         return value
 
     def serialize(self, value, **environment):
+        value = super(Unicode, self).serialize(value, **environment)
         return value.encode(self.encoding)
 
 
@@ -625,4 +626,5 @@ class UtcDateTime(Field):
         raise InvalidValue(self, "Invalid DateTime", value)
 
     def serialize(self, value, **environment):
+        value = super(UtcDateTime, self).serialize(value, **environment)
         return str(value)
