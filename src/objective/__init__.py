@@ -15,6 +15,11 @@ Basic assumtion is that serialization format is a JSON like representation of da
 
 """
 import functools
+from itertools import chain
+
+from datetime import datetime
+from dateutil.parser import parse as dateutil_parse
+import pytz
 
 
 class Item(object):
@@ -218,8 +223,8 @@ class Invalid(Exception):
 
         self.node = node
         self.value = value
-        self.msg = msg or "Invalid value for `{name}`: {0.value}"\
-            .format(self, name=node._name)
+        self.message = msg or "Invalid value for `{name}`: {0.value}"\
+            .format(self, name=self.node_name)
 
     def __repr__(self):
         return "<{0.__class__.__name__}: {0.node_name} = {0.value}>"\
@@ -227,6 +232,8 @@ class Invalid(Exception):
 
     @property
     def node_name(self):
+        """Return the name of this node or its class name."""
+
         return self.node._name or self.node.__class__.__name__
 
 
@@ -242,8 +249,18 @@ class InvalidChildren(Invalid):
     def __iter__(self):
         """Traverse through children an yield name, child."""
 
-        for child in self.children:
-            yield child.node._name, child
+        for invalid in self.children:
+            yield [invalid], invalid
+
+            if isinstance(invalid, InvalidChildren):
+                for path, child in invalid:
+                    yield [invalid] + list(path), child
+
+    def error_dict(self):
+        return {
+            '.'.join(x.node_name for x in path): invalid.message
+            for path, invalid in self
+        }
 
 
 class InvalidValue(Invalid):
@@ -590,12 +607,6 @@ class Unicode(Field):
     def serialize(self, value, **environment):
         value = super(Unicode, self).serialize(value, **environment)
         return value.encode(self.encoding)
-
-
-from datetime import datetime
-from dateutil.parser import parse as dateutil_parse
-from dateutil.tz import tzutc
-import pytz
 
 
 def totimestamp(dt, epoch=datetime(1970, 1, 1, tzinfo=pytz.utc)):

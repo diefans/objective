@@ -13,6 +13,45 @@ class TestValidator(object):
         assert v('foo') == 'foo'
 
 
+def test_invalid_generator():
+    import objective
+
+    class M(objective.Mapping):
+        foo = objective.Item(objective.Field)
+        bam = objective.Item(objective.Field, missing=objective.Ignore)
+        fom = objective.Item(objective.Field, missing='default')
+
+        @objective.Item(missing=objective.Ignore)
+        class biz(objective.Mapping):
+            baz = objective.Item(objective.Field)
+            xyz = objective.Item(objective.Field)
+
+        @objective.Item()
+        class bar(objective.Mapping):
+            baz = objective.Item(objective.Field)
+            xyz = objective.Item(objective.Field)
+
+            @objective.Item()
+            class bar2(objective.Mapping):
+                baz2 = objective.Item(objective.Field)
+                xyz2 = objective.Item(objective.Field)
+
+    with pytest.raises(objective.Invalid) as err:
+        M().deserialize({'bar': {'bar2': {}}})
+
+    errors = err.value.error_dict()
+
+    assert errors == {
+        'bar.bar2.baz2': 'Value for `baz2` is missing!',
+        'bar.xyz': 'Value for `xyz` is missing!',
+        'bar': 'Invalid value for `bar`: <Undefined>',
+        'bar.bar2': 'Invalid value for `bar2`: <Undefined>',
+        'bar.baz': 'Value for `baz` is missing!',
+        'foo': 'Value for `foo` is missing!',
+        'bar.bar2.xyz2': 'Value for `xyz2` is missing!'
+    }
+
+
 class TestFields(object):
 
     def test_schema(self):
