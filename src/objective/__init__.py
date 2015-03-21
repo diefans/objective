@@ -258,7 +258,7 @@ class InvalidChildren(Invalid):
 
     def error_dict(self):
         return {
-            '.'.join(x.node_name for x in path): invalid.message
+            tuple(x.node_name for x in path): invalid.message
             for path, invalid in self
         }
 
@@ -324,8 +324,8 @@ def validate(meth):
 
         # validate after we resolved the value
         # TODO find out if we need to validate also the missing value
-        if callable(self.validator):
-            value = self.validator(value, **environment)
+        if callable(self._validator):
+            value = self._validator(value, **environment)
 
         return value
 
@@ -342,7 +342,7 @@ class Field(Node):
     """
 
     # TODO think about making this private by _
-    validator = None
+    _validator = None
 
     def __init__(self, validator=None, **kwargs):
         """Optionally Assigns the validator.
@@ -352,11 +352,15 @@ class Field(Node):
         """
 
         if callable(validator):
-            self.validator = validator
+            self._validator = validator
 
         # TODO think about making this private by _
         # this is intentionally in kwargs, so we can also apply ``None`` for missing
-        self.missing = kwargs.get('missing', Missing)
+        self._missing = kwargs.get('missing', Missing)
+
+        # missing=Ignore shortcut: optional=True
+        if 'missing' not in kwargs and kwargs.get('optional', False):
+            self._missing = Ignore
 
     def resolve_value(self, value, **environment):
         """Resolve the value.
@@ -369,20 +373,20 @@ class Field(Node):
 
         # here we care about Undefined values
         if isinstance(value, Undefined):
-            if isinstance(self.missing, type) and issubclass(self.missing, Missing):
+            if isinstance(self._missing, type) and issubclass(self._missing, Missing):
                 # instantiate the missing thing
-                missing = self.missing(self, **environment)
+                missing = self._missing(self, **environment)
 
                 # invoke missing callback
                 # the default is to raise a MissingValue() exception
                 value = missing(value)
 
-            elif callable(self.missing):
-                value = self.missing()
+            elif callable(self._missing):
+                value = self._missing()
 
             else:
                 # we just assign any value
-                value = self.missing
+                value = self._missing
 
         return value
 

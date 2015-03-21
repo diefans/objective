@@ -13,6 +13,15 @@ class TestValidator(object):
         assert v('foo') == 'foo'
 
 
+def test_optional():
+    import objective
+
+    class M(objective.Mapping):
+        missing = objective.Item(objective.Field, optional=True)
+
+    assert M().deserialize({}) == {}
+
+
 def test_invalid_generator():
     import objective
 
@@ -42,13 +51,13 @@ def test_invalid_generator():
     errors = err.value.error_dict()
 
     assert errors == {
-        'bar.bar2.baz2': 'Value for `baz2` is missing!',
-        'bar.xyz': 'Value for `xyz` is missing!',
-        'bar': 'Invalid value for `bar`: <Undefined>',
-        'bar.bar2': 'Invalid value for `bar2`: <Undefined>',
-        'bar.baz': 'Value for `baz` is missing!',
-        'foo': 'Value for `foo` is missing!',
-        'bar.bar2.xyz2': 'Value for `xyz2` is missing!'
+        ('foo',): 'Value for `foo` is missing!',
+        ('bar',): 'Invalid value for `bar`: <Undefined>',
+        ('bar', 'baz'): 'Value for `baz` is missing!',
+        ('bar', 'xyz'): 'Value for `xyz` is missing!',
+        ('bar', 'bar2'): 'Invalid value for `bar2`: <Undefined>',
+        ('bar', 'bar2', 'baz2'): 'Value for `baz2` is missing!',
+        ('bar', 'bar2', 'xyz2'): 'Value for `xyz2` is missing!'
     }
 
 
