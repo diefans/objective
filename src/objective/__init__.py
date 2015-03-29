@@ -534,7 +534,7 @@ class Mapping(Field):
             # deserialize each item
             try:
                 mapping[name] = item.deserialize(
-                    value.get(name, Undefined()), **environment
+                    validated.get(name, Undefined()), **environment
                 )
 
             except IgnoreValue:

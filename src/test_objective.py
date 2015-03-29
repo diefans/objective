@@ -408,3 +408,17 @@ class TestNode(object):
             s['bam']['missing']         # pylint: disable=W0104
 
         assert ex.value.message == '`missing` not in <bar: baz, bim>'
+
+
+def test_body_missing_bug():
+    import objective
+
+    class M(objective.Mapping):
+        @objective.Item(missing={})
+        class body(objective.Mapping):
+            foo = objective.Item(objective.Field, optional=True)
+
+    m = M()
+
+    result = m.deserialize({})
+    assert result == {'body': {}}
