@@ -280,7 +280,7 @@ class IgnoreValue(UndefinedValue):
 
 class Validator(object):
 
-    def __call__(self, value, **environment):
+    def __call__(self, value, environment=None):
         """Perform value validation.
 
         Should raise ``Invalid`` if something seems wrong.
@@ -294,7 +294,7 @@ class Missing(object):
 
     """Defines an action to be peformed when the value is missing."""
 
-    def __init__(self, node, **environment):
+    def __init__(self, node, environment=None):
         self.node = node
         self.environment = environment
 
@@ -318,14 +318,14 @@ def validate(meth):
     """Decorate a deserialize function with a validator."""
 
     @functools.wraps(meth)
-    def wrapper(self, value, **environment):
+    def wrapper(self, value, environment=None):
         # get validated value from supers
-        value = meth(self, value, **environment)
+        value = meth(self, value, environment)
 
         # validate after we resolved the value
         # TODO find out if we need to validate also the missing value
         if callable(self._validator):
-            value = self._validator(value, **environment)
+            value = self._validator(value, environment)
 
         return value
 
@@ -362,7 +362,7 @@ class Field(Node):
         if 'missing' not in kwargs and kwargs.get('optional', False):
             self._missing = Ignore
 
-    def resolve_value(self, value, **environment):
+    def resolve_value(self, value, environment=None):
         """Resolve the value.
 
         Either apply missing or leave the value as is.
@@ -375,7 +375,7 @@ class Field(Node):
         if isinstance(value, Undefined):
             if isinstance(self._missing, type) and issubclass(self._missing, Missing):
                 # instantiate the missing thing
-                missing = self._missing(self, **environment)
+                missing = self._missing(self, environment)
 
                 # invoke missing callback
                 # the default is to raise a MissingValue() exception
@@ -390,7 +390,7 @@ class Field(Node):
 
         return value
 
-    def serialize(self, value, **environment):
+    def serialize(self, value, environment=None):
         """Serialze a value into a transportable and interchangeable format.
 
         The default assumption is that the value is JSON e.g. string or number.
@@ -400,12 +400,12 @@ class Field(Node):
         bounced, since the mistake comes from there - use unittests for this!
 
         """
-        value = self.resolve_value(value, **environment)
+        value = self.resolve_value(value, environment)
 
         return value
 
     @validate
-    def deserialize(self, value, **environment):
+    def deserialize(self, value, environment=None):
         """Deserialize a value into a special application specific format or type.
 
         ``value`` can be ``Missing``, ``None`` or something else.
@@ -413,7 +413,7 @@ class Field(Node):
         :param value: the value to be deserialized
         :param environment: additional environment
         """
-        value = self.resolve_value(value, **environment)
+        value = self.resolve_value(value, environment)
 
         return value
 
@@ -431,25 +431,25 @@ class ListMixin(object):
             inst.__dict__['items'] = items.__get__(inst, cls)
         return inst
 
-    def traverse_children(self, value, **environment):
+    def traverse_children(self, value, environment=None):
         # items must be defined
         items = getattr(self, 'items')
 
         for item in value:
-            yield items.deserialize(item)
+            yield items.deserialize(item, environment)
 
 
 class Set(Field, ListMixin):
 
     @validate
-    def deserialize(self, value, **environment):
+    def deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value."""
 
         # first invoke super validation
-        validated = super(Set, self).deserialize(value, **environment)
+        validated = super(Set, self).deserialize(value, environment)
 
         # traverse items and match against validated struct
-        collection = {item for item in self.traverse_children(validated, **environment)}
+        collection = {item for item in self.traverse_children(validated, environment)}
 
         return collection
 
@@ -457,14 +457,14 @@ class Set(Field, ListMixin):
 class List(Field, ListMixin):
 
     @validate
-    def deserialize(self, value, **environment):
+    def deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value."""
 
         # first invoke super validation
-        validated = super(List, self).deserialize(value, **environment)
+        validated = super(List, self).deserialize(value, environment)
 
         # traverse items and match against validated struct
-        collection = [item for item in self.traverse_children(validated, **environment)]
+        collection = [item for item in self.traverse_children(validated, environment)]
 
         return collection
 
@@ -473,26 +473,26 @@ class Mapping(Field):
 
     """A ``Mapping`` resembles a dict like structure."""
 
-    def traverse_children(self, value, **environment):
+    def traverse_children(self, value, environment=None):
         """Traverse over all defined items and return a dictionary."""
 
         for name, item in self:
             yield name, item
 
-    def serialize(self, value, **environment):
+    def serialize(self, value, environment=None):
 
-        serialized = super(Mapping, self).serialize(value, **environment)
+        serialized = super(Mapping, self).serialize(value, environment)
 
         mapping = {}
 
         invalids = []
 
-        for name, item in self.traverse_children(serialized, **environment):
+        for name, item in self.traverse_children(serialized, environment):
 
             # deserialize each item
             try:
                 mapping[name] = item.serialize(
-                    serialized.get(name, Undefined()), **environment
+                    serialized.get(name, Undefined()), environment
                 )
 
             except IgnoreValue:
@@ -510,31 +510,31 @@ class Mapping(Field):
         return mapping
 
         return {
-            name: item.serialize(value.get(name, Undefined()), **environment)
-            for name, item in self.traverse_children(value, **environment)
+            name: item.serialize(value.get(name, Undefined()), environment)
+            for name, item in self.traverse_children(value, environment)
         }
 
     @validate
-    def deserialize(self, value, **environment):
+    def deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value.
 
         :param value: a ``dict`` wich contains mapped values
         """
 
         # first invoke super validation
-        validated = super(Mapping, self).deserialize(value, **environment)
+        validated = super(Mapping, self).deserialize(value, environment)
 
         # traverse items and match against validated struct
         mapping = {}
 
         invalids = []
 
-        for name, item in self.traverse_children(validated, **environment):
+        for name, item in self.traverse_children(validated, environment):
 
             # deserialize each item
             try:
                 mapping[name] = item.deserialize(
-                    validated.get(name, Undefined()), **environment
+                    validated.get(name, Undefined()), environment
                 )
 
             except IgnoreValue:
@@ -558,8 +558,8 @@ class Number(Field):
 
     types = (int, float)
 
-    def deserialize(self, value, **environment):
-        value = super(Number, self).deserialize(value, **environment)
+    def deserialize(self, value, environment=None):
+        value = super(Number, self).deserialize(value, environment)
 
         for _type in self.types:
             try:
@@ -593,8 +593,8 @@ class Unicode(Field):
 
     encoding = "utf-8"
 
-    def deserialize(self, value, **environment):
-        value = super(Unicode, self).deserialize(value, **environment)
+    def deserialize(self, value, environment=None):
+        value = super(Unicode, self).deserialize(value, environment)
 
         # ensure we have a unicode afterwards
         if isinstance(value, unicode):
@@ -608,8 +608,8 @@ class Unicode(Field):
 
         return value
 
-    def serialize(self, value, **environment):
-        value = super(Unicode, self).serialize(value, **environment)
+    def serialize(self, value, environment=None):
+        value = super(Unicode, self).serialize(value, environment)
         return value.encode(self.encoding)
 
 
@@ -623,8 +623,8 @@ class UtcDateTime(Field):
 
     """Represents a datetime string in UTC."""
 
-    def deserialize(self, value, **environment):
-        value = super(UtcDateTime, self).deserialize(value, **environment)
+    def deserialize(self, value, environment=None):
+        value = super(UtcDateTime, self).deserialize(value, environment)
 
         # test for a timestamp
         if isinstance(value, basestring):
@@ -640,6 +640,6 @@ class UtcDateTime(Field):
 
         raise InvalidValue(self, "Invalid DateTime", value)
 
-    def serialize(self, value, **environment):
-        value = super(UtcDateTime, self).serialize(value, **environment)
+    def serialize(self, value, environment=None):
+        value = super(UtcDateTime, self).serialize(value, environment)
         return str(value)
