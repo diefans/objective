@@ -11,11 +11,10 @@ So I invented the wheel a little bit rounder - at least for me.
 
 The plan is to declarativly build a structure which has to be instanciated for examination.
 
-Basic assumtion is that serialization format is a JSON like representation of data.
+Basic assumption is that serialization format is a JSON like representation of data.
 
 """
 import functools
-from itertools import chain
 
 from datetime import datetime
 from dateutil.parser import parse as dateutil_parse
@@ -96,7 +95,7 @@ class Item(object):
         if self.node_class is not None:
             node = self.node_class(*self.node_args, **self.node_kwargs)
 
-            node._item = self
+            node._item = self       # pylint: disable=W0212
 
             return node
 
@@ -106,7 +105,7 @@ class Item(object):
 
 class NodeMeta(type):
 
-    """Performs ``Node`` instantiation by lookup ``Item`` instances."""
+    """Performs ``Node`` instantiation by looking up ``Item`` instances."""
 
     base = None
 
@@ -121,7 +120,7 @@ class NodeMeta(type):
             # inherite from bases
             for base in bases:
                 if issubclass(base, mcs.base):
-                    items.update(base._children)
+                    items.update(base._children)        # pylint: disable=W0212
 
         # take own items last
         # override name with explicit item.name
@@ -147,7 +146,7 @@ class Node(object):
 
     __metaclass__ = NodeMeta
 
-    # stores all children items, collected by __new__
+    # stores all child items, collected by __new__
     _children = {}
 
     # the item this node was created by
@@ -234,7 +233,7 @@ class Invalid(Exception):
     def node_name(self):
         """Return the name of this node or its class name."""
 
-        return self.node._name or self.node.__class__.__name__
+        return self.node._name or self.node.__class__.__name__              # pylint: disable=W0212
 
 
 class InvalidChildren(Invalid):
@@ -301,9 +300,11 @@ class Missing(object):
     def __call__(self, value):
         """Just raise a ``MissingValue`` exception."""
 
-        raise MissingValue(self.node,
-                           value=value,
-                           msg="Value for `{0}` is missing!".format(self.node._name))
+        raise MissingValue(
+            self.node,
+            value=value,
+            msg="Value for `{0}` is missing!".format(self.node._name)           # pylint: disable=W0212
+        )
 
 
 class Ignore(Missing):
@@ -311,7 +312,7 @@ class Ignore(Missing):
     def __call__(self, value):
         """We raise an ``IgnoreValue`` exception."""
 
-        raise IgnoreValue("Ignore `{}`.".format(self.node._name))
+        raise IgnoreValue("Ignore `{}`.".format(self.node._name))               # pylint: disable=W0212
 
 
 def validate(meth):
@@ -324,8 +325,9 @@ def validate(meth):
 
         # validate after we resolved the value
         # TODO find out if we need to validate also the missing value
-        if callable(self._validator):
-            value = self._validator(value, environment)
+
+        if callable(self._validator):   # pylint: disable=W0212
+            value = self._validator(value, environment)     # pylint: disable=W0212
 
         return value
 
@@ -338,10 +340,9 @@ class Field(Node):
 
     It can serialize and deserialize a value.
 
-    An optional validator sanitizes the value before deserializing it.
+    An optional validator sanitizes the value after deserializing it.
     """
 
-    # TODO think about making this private by _
     _validator = None
 
     def __init__(self, validator=None, **kwargs):
@@ -354,7 +355,6 @@ class Field(Node):
         if callable(validator):
             self._validator = validator
 
-        # TODO think about making this private by _
         # this is intentionally in kwargs, so we can also apply ``None`` for missing
         self._missing = kwargs.get('missing', Missing)
 
@@ -508,11 +508,6 @@ class Mapping(Field):
             raise InvalidChildren(self, invalids)
 
         return mapping
-
-        return {
-            name: item.serialize(value.get(name, Undefined()), environment)
-            for name, item in self.traverse_children(value, environment)
-        }
 
     @validate
     def deserialize(self, value, environment=None):
