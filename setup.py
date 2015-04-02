@@ -31,6 +31,15 @@ class PyTest(TestCommand):
 setup(
     name="objective",
     version="0.0.3",
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: Unlicense',
+        'Programming Language :: Python',
+    ],
+
+    keywords="serialization deserialization validation suckless",
+
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,
