@@ -217,11 +217,14 @@ class Invalid(Exception):
 
     """Raised when a validator failed."""
 
-    def __init__(self, node, msg=None, value=Undefined(), *args, **kwargs):
-        super(Invalid, self).__init__(node, msg, value, *args)
 
+class InvalidValue(Invalid):
+
+    """Raised when a type is not as expected."""
+
+    def __init__(self, node, msg=None, **kwargs):
         self.node = node
-        self.value = value
+        self.value = kwargs.pop("value", Undefined())
         self.message = msg or "Invalid value for `{name}`: {0.value}"\
             .format(self, name=self.node_name)
 
@@ -236,12 +239,12 @@ class Invalid(Exception):
         return self.node._name or self.node.__class__.__name__              # pylint: disable=W0212
 
 
-class InvalidChildren(Invalid):
+class InvalidChildren(InvalidValue):
 
     """Contains a list of previously raised Invalids."""
 
-    def __init__(self, node, children, *args, **kwargs):
-        super(InvalidChildren, self).__init__(node, *args, **kwargs)
+    def __init__(self, node, children, **kwargs):
+        super(InvalidChildren, self).__init__(node, **kwargs)
 
         self.children = children
 
@@ -262,12 +265,7 @@ class InvalidChildren(Invalid):
         }
 
 
-class InvalidValue(Invalid):
-
-    """Raised when a type is not as expected."""
-
-
-class MissingValue(Invalid, UndefinedValue):
+class MissingValue(InvalidValue, UndefinedValue):
 
     """Raised when a value is not defined but seems to be mandatory."""
 
@@ -327,7 +325,16 @@ def validate(meth):
         # TODO find out if we need to validate also the missing value
 
         if callable(self._validator):   # pylint: disable=W0212
-            value = self._validator(value, environment)     # pylint: disable=W0212
+            try:
+                value = self._validator(self, value, environment)     # pylint: disable=W0212
+
+            except InvalidValue:
+                # just reraise
+                raise
+
+            except Invalid:
+                # we convert a bare Invalid into InvalidValue
+                raise InvalidValue(self, value=value)
 
         return value
 
@@ -564,8 +571,13 @@ class Number(Field):
             except ValueError:      # pylint: disable=W0704
                 pass
 
-        raise InvalidValue(self, "Invalid value `{value}` for `{types}`"
-                           .format(value=value, types=self.types), value)
+        raise InvalidValue(
+            self,
+            msg="Invalid value `{value}` for `{types}`".format(
+                value=value, types=self.types
+            ),
+            value=value
+        )
 
 
 class Float(Number):
