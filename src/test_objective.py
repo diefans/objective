@@ -3,14 +3,42 @@
 import pytest
 
 
-class TestValidator(object):
+def test_validate():
+    import objective
 
-    def test_validate(self):
-        import objective
+    v = objective.Validator()
 
-        v = objective.Validator()
+    assert v(None, 'foo') == 'foo'
 
-        assert v('foo') == 'foo'
+
+def test_validator_inheritance():
+    import objective
+
+    class Foo(objective.Int):
+        def _validator(self, node, value, environment=None):
+            return "foo"
+
+    def bar_validator(self, node, value, env=None):
+        return "bar"
+
+    class Bar(Foo):
+        _validator = bar_validator
+
+    class Baz(Bar):
+        def _validator(self, node, value, environment=None):
+            return "baz"
+
+    foo = Foo()
+    assert foo.deserialize("123") == "foo"
+
+    bar = Bar()
+    assert bar.deserialize("123") == "bar"
+
+    baz = Baz()
+    assert baz.deserialize("123") == "baz"
+
+    baz2 = Baz(validator=lambda _, x, e=None: "bam")
+    assert baz2.deserialize("123") == "bam"
 
 
 def test_optional():
@@ -66,14 +94,14 @@ class TestFields(object):
     def test_schema(self):
         import objective
 
-        class S(objective.Node):
+        class S(objective.core.Node):
             foo = objective.Item(objective.Field)
 
         assert isinstance(S.foo, objective.Item)
 
         s = S()
 
-        assert isinstance(s.foo, objective.Node)
+        assert isinstance(s.foo, objective.core.Node)
         assert isinstance(s.foo, objective.Field)
 
     def test_mapping(self):
@@ -130,6 +158,7 @@ class TestFields(object):
 
     def test_mapping_missing(self):
         import objective
+        import objective.exc
 
         class M(objective.Mapping):
             foo = objective.Item(objective.Field, missing='1')
@@ -146,7 +175,7 @@ class TestFields(object):
         with pytest.raises(objective.Invalid) as ex:
             m.deserialize({'bam': {}})
 
-        assert isinstance(ex.value, objective.InvalidChildren)
+        assert isinstance(ex.value, objective.exc.InvalidChildren)
         assert ex.value.children[0].node == m.bam
         assert ex.value.children[0].children[0].node == m.bam.foo
         assert ex.value.children[1].node == m.bar
@@ -179,6 +208,7 @@ class TestNumber(object):
 
     def test_number_mapping_invalid(self):
         import objective
+        import objective.exc
 
         class M(objective.Mapping):
             n = objective.Item(objective.Number)
@@ -189,13 +219,14 @@ class TestNumber(object):
         with pytest.raises(objective.Invalid) as ex:
             m.deserialize({'n': "foo"})
 
-        assert isinstance(ex.value, objective.InvalidChildren)
+        assert isinstance(ex.value, objective.exc.InvalidChildren)
         assert ex.value.children[0].node == m.n
 
     def test_number_invalid(self):
         import objective
+        import objective.exc
 
-        with pytest.raises(objective.InvalidValue):
+        with pytest.raises(objective.exc.InvalidValue):
             objective.Number().deserialize("foo")
 
 
@@ -284,6 +315,8 @@ def test_serialize():
 
 def test_serialize_missing():
     import objective
+    import objective.values
+    import objective.exc
 
     dct = {"foo": 123}
 
@@ -292,11 +325,11 @@ def test_serialize_missing():
         bar = objective.Item(objective.Field)
 
     m = M()
-    with pytest.raises(objective.InvalidChildren) as e:
+    with pytest.raises(objective.exc.InvalidChildren) as e:
         m.serialize(dct)
 
     assert e.value.children[0].node._name == 'bar'
-    assert isinstance(e.value.children[0].value, objective.Undefined)
+    assert isinstance(e.value.children[0].value, objective.values.Undefined)
 
 
 class TestDateTime(object):
@@ -307,10 +340,10 @@ class TestDateTime(object):
         1399472349.522,
     ])
     def test_deserialize(self, ds):
-        import objective
+        import objective.fields
 
-        result = objective.dateutil_parse("2014-05-07T14:19:09.522Z")
-        f = objective.UtcDateTime()
+        result = objective.fields.dateutil_parse("2014-05-07T14:19:09.522Z")
+        f = objective.fields.UtcDateTime()
 
         assert f.deserialize(ds) == result
 
@@ -318,33 +351,33 @@ class TestDateTime(object):
 class TestNode(object):
 
     def test_schema(self):
-        import objective
+        import objective.core
 
-        class Schema(objective.Node):
+        class Schema(objective.core.Node):
 
-            foo = objective.Item(objective.Node)
-            _bar = objective.Item(objective.Node, name='bar')
+            foo = objective.Item(objective.core.Node)
+            _bar = objective.Item(objective.core.Node, name='bar')
 
             @objective.Item(name='sub')
-            class _sub(objective.Node):
-                fom = objective.Item(objective.Node)
+            class _sub(objective.core.Node):
+                fom = objective.Item(objective.core.Node)
 
         s = Schema()
 
-        assert isinstance(s, objective.Node)
-        assert isinstance(s.foo, objective.Node)
-        assert isinstance(s._bar, objective.Node)
-        assert isinstance(s._sub, objective.Node)
-        assert isinstance(s._sub.fom, objective.Node)
+        assert isinstance(s, objective.core.Node)
+        assert isinstance(s.foo, objective.core.Node)
+        assert isinstance(s._bar, objective.core.Node)
+        assert isinstance(s._sub, objective.core.Node)
+        assert isinstance(s._sub.fom, objective.core.Node)
         assert isinstance(Schema.foo, objective.Item)
 
     def test_name(self):
-        import objective
+        import objective.core
 
-        class S(objective.Node):
+        class S(objective.core.Node):
 
-            foo = objective.Item(objective.Node)
-            bar = objective.Item(objective.Node, name='BAR')
+            foo = objective.Item(objective.core.Node)
+            bar = objective.Item(objective.core.Node, name='BAR')
 
         s = S()
 
@@ -352,11 +385,11 @@ class TestNode(object):
         assert s.bar._name == 'BAR'
 
     def test_iter(self):
-        import objective
+        import objective.core
 
-        class S(objective.Node):
-            foo = objective.Item(objective.Node)
-            bar = objective.Item(objective.Node)
+        class S(objective.core.Node):
+            foo = objective.Item(objective.core.Node)
+            bar = objective.Item(objective.core.Node)
 
         s = S()
 
@@ -366,40 +399,40 @@ class TestNode(object):
         assert ('bar', s.bar) in items
 
     def test_inheritance(self):
-        import objective
+        import objective.core
 
-        class S1(objective.Node):
-            foo = objective.Item(objective.Node)
+        class S1(objective.core.Node):
+            foo = objective.Item(objective.core.Node)
 
         class S2(S1):
-            bar = objective.Item(objective.Node)
+            bar = objective.Item(objective.core.Node)
 
-        class S3(objective.Node):
-            bam = objective.Item(objective.Node)
+        class S3(objective.core.Node):
+            bam = objective.Item(objective.core.Node)
 
         class S4(S2, S3):
-            bar = objective.Item(objective.Node)
+            bar = objective.Item(objective.core.Node)
 
         assert 'foo' in S4._children
         assert 'bar' in S4._children
         assert 'bam' in S4._children
 
     def test_getitem(self):
-        import objective
+        import objective.core
 
-        class S1(objective.Node):
-            foo = objective.Item(objective.Node)
+        class S1(objective.core.Node):
+            foo = objective.Item(objective.core.Node)
 
             @objective.Item(name='bam')
-            class bar(objective.Node):
-                baz = objective.Item(objective.Node)
-                bim = objective.Item(objective.Node)
+            class bar(objective.core.Node):
+                baz = objective.Item(objective.core.Node)
+                bim = objective.Item(objective.core.Node)
 
         s = S1()
 
-        assert isinstance(s['foo'], objective.Node)
-        assert isinstance(s['bam'], objective.Node)
-        assert isinstance(s['bam']['baz'], objective.Node)
+        assert isinstance(s['foo'], objective.core.Node)
+        assert isinstance(s['bam'], objective.core.Node)
+        assert isinstance(s['bam']['baz'], objective.core.Node)
 
         # test id
         assert id(s['foo']) == id(s['foo'])
