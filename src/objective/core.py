@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from . import validation, exc, values
 
 
@@ -119,7 +121,7 @@ class NodeMeta(type):
         """Collect all ``Item`` instances and add them to the new class."""
 
         # collect all items
-        items = {}
+        items = OrderedDict()
 
         # if we don't have a base yet, we ignore possible items
         if mcs.base:
@@ -145,6 +147,9 @@ class NodeMeta(type):
 
         return cls
 
+    def __iter__(cls):
+        return cls._children.iteritems()
+
 
 class Node(object):
 
@@ -162,6 +167,9 @@ class Node(object):
     def _name(self):
         return self._item and self._item.name or None
 
+    def __contains__(self, name):
+        return name in self._children
+
     def __getitem__(self, name):
         """Returns a previously collected ``Item``, which will be a ``Node`` by descriptor magic."""
 
@@ -170,39 +178,25 @@ class Node(object):
 
         raise KeyError("`{}` not in {}".format(name, self))
 
-    def __contains__(self, name):
-        return name in self._children
-
-    def get(self, name, default=None):
-        if name in self:
-            return self[name]
-
-        return default
-
     def __iter__(self):
         """Iterates over all items and returns appropriate nodes."""
 
         for name in self._children:
             yield name, getattr(self, name)
 
-    def iteritems(self):
-        return iter(self)
-
-    def itervalues(self):
-        for name in self._children:
-            yield getattr(self, name)
-
-    def iterkeys(self):
-        for name in self._children:
-            yield name
-
     def __repr__(self):
         """Represent a Node."""
 
-        return "<{n.__class__.__name__}: {items}>"\
+        return "<{n.__class__.__name__}:{n._name} [{items}]>"\
             .format(
                 n=self, items=', '.join(sorted(self._children))
             )
+
+    def get(self, name, default=None):
+        if name in self:
+            return self[name]
+
+        return default
 
 
 class Field(Node):

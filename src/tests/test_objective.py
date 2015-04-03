@@ -18,11 +18,8 @@ def test_validator_inheritance():
         def _validator(self, node, value, environment=None):
             return "foo"
 
-    def bar_validator(self, node, value, env=None):
-        return "bar"
-
     class Bar(Foo):
-        _validator = bar_validator
+        pass
 
     class Baz(Bar):
         def _validator(self, node, value, environment=None):
@@ -32,7 +29,7 @@ def test_validator_inheritance():
     assert foo.deserialize("123") == "foo"
 
     bar = Bar()
-    assert bar.deserialize("123") == "bar"
+    assert bar.deserialize("123") == "foo"
 
     baz = Baz()
     assert baz.deserialize("123") == "baz"
@@ -441,7 +438,7 @@ class TestNode(object):
         with pytest.raises(KeyError) as ex:
             s['bam']['missing']         # pylint: disable=W0104
 
-        assert ex.value.message == '`missing` not in <bar: baz, bim>'
+        assert ex.value.message == '`missing` not in <bar:bam [baz, bim]>'
 
 
 def test_body_missing_bug():
@@ -456,3 +453,19 @@ def test_body_missing_bug():
 
     result = m.deserialize({})
     assert result == {'body': {}}
+
+
+def test_multiple_inheritance():
+    import objective
+
+    class A(objective.Mapping):
+        foo = objective.Item(objective.Field)
+
+    class B(objective.Mapping):
+        bar = objective.Item(objective.Field)
+
+    class C(A, B):
+        baz = objective.Item(objective.Field)
+
+    assert [name for name, _ in C] == ["foo", "bar", "baz"]
+    assert [name for name, _ in C()] == ["foo", "bar", "baz"]
