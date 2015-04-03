@@ -55,7 +55,7 @@ class InvalidChildren(InvalidValue):
 
     def error_dict(self):
         return {
-            tuple(x.node_name for x in path): invalid.message
+            tuple(x.node_name for x in path): invalid
             for path, invalid in self
         }
 

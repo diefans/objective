@@ -76,7 +76,8 @@ def test_invalid_generator():
     with pytest.raises(objective.Invalid) as err:
         M().deserialize({'bar': {'bar2': {}}})
 
-    errors = err.value.error_dict()
+    errors = {path: invalid.message
+              for path, invalid in err.value.error_dict().iteritems()}
 
     assert errors == {
         ('foo',): 'Value for `foo` is missing!',
