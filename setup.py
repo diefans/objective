@@ -30,7 +30,7 @@ class PyTest(TestCommand):
 
 setup(
     name="objective",
-    version="0.0.3",
+    version="0.0.4",
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
@@ -46,7 +46,8 @@ setup(
     zip_safe=False,
     install_requires=[
         "python-dateutil",
-        "pytz"
+        "pytz",
+        "validate_email",
     ],
     tests_require=[
         "pytest",

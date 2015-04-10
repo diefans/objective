@@ -1,5 +1,7 @@
 import functools
 
+import validate_email
+
 from . import exc
 
 
@@ -67,3 +69,28 @@ class NoneOf(Validator):
             raise exc.Invalid()
 
         return value
+
+
+class Email(Validator):
+
+    """Validate an email.
+
+    if ``pyDNS`` is installed you can check mx and verify the existance of that
+    email.
+
+    """
+
+    def __init__(self, verify=False, check_mx=False):
+        self.check_mx = check_mx
+        self.verify = verify
+
+    def __call__(self, node, value, environment=None):
+        if isinstance(value, basestring):
+            if validate_email.validate_email(
+                    value,
+                    check_mx=self.check_mx,
+                    verify=self.verify
+            ):
+                return value
+
+        raise exc.Invalid()
