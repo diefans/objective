@@ -17,16 +17,19 @@ class Missing(object):
         raise exc.MissingValue(
             self.node,
             value=value,
-            msg="Value for `{0}` is missing!".format(self.node._name)           # pylint: disable=W0212
+            msg="Value for `{0}` is missing!".format(self.node.__name__)
         )
 
 
 class Ignore(Missing):
 
+    """:py:class:`Ignore` will make the deserialization simply ignore the
+    missing value."""
+
     def __call__(self, value):
         """We raise an ``IgnoreValue`` exception."""
 
-        raise exc.IgnoreValue("Ignore `{}`.".format(self.node._name))               # pylint: disable=W0212
+        raise exc.IgnoreValue("Ignore `{}`.".format(self.node.__name__))
 
 
 class Item(object):
@@ -56,8 +59,8 @@ class Item(object):
         """Resolve the ``Node`` instance or return the ``Item`` instance."""
 
         if obj is None:
-            # return the Item if accessed over class
-            return self
+            # return the node class if accessed over class
+            return self.node_class
 
         if self.node is None:
             self.node = self.create_node()
@@ -78,32 +81,29 @@ class Item(object):
     def attach_name(self, name):
         """Attach a name to an item.
 
-        Called by NodeMeta to attach a name to an item.
+        Called by :py:class:`NodeMeta` to attach a name to an item.
 
         If the item.name is already set the parent name will be ignored.
         So we are able to map certain external names, which might be reserved words
         to varying internal ones.
 
-        :returns: a tuple of name, self
-
         """
+
         if not self.name:
             self.name = name
 
-        return self.name, self
-
     def create_node(self):
-        """Create a ``Node`` instance.
+        """Create a :py:class:`Node` instance.
 
         All args and kwargs are forwarded to the node.
 
-        :returns: a ``Node`` instance
+        :returns: a :py:class:`Node` instance
         """
 
         if self.node_class is not None:
             node = self.node_class(*self.node_args, **self.node_kwargs)
 
-            node._item = self       # pylint: disable=W0212
+            node.__item__ = self
 
             return node
 
@@ -115,40 +115,51 @@ class NodeMeta(type):
 
     """Performs ``Node`` instantiation by looking up ``Item`` instances."""
 
-    base = None
+    __node_base__ = None
 
     def __new__(mcs, name, bases, dct):
         """Collect all ``Item`` instances and add them to the new class."""
 
-        # collect all items
-        items = OrderedDict()
-
-        # if we don't have a base yet, we ignore possible items
-        if mcs.base:
-            # inherite from bases
-            for base in bases:
-                if issubclass(base, mcs.base):
-                    items.update(base._children)        # pylint: disable=W0212
-
-        # take own items last
-        # override name with explicit item.name
-        items.update(item.attach_name(name)
-                     for name, item in dct.iteritems()
-                     if isinstance(item, Item))
-
-        # add items to the new class
-        dct['_children'] = items
-
         cls = type.__new__(mcs, name, bases, dct)
 
         # just register our base class so we know it for items collection
-        if mcs.base is None:
-            mcs.base = cls
+        if mcs.__node_base__ is None:
+            mcs.__node_base__ = cls
 
         return cls
 
+    def __init__(cls, name, bases, dct):
+        super(NodeMeta, cls).__init__(name, bases, dct)
+
+        # a simple name mapping
+        cls.__names__ = OrderedDict()
+
+        # if we don't have a base yet, we ignore possible items
+        if cls.__node_base__:
+            # inherite from bases
+            for base in bases:
+                if issubclass(base, cls.__node_base__):
+                    cls.__names__.update(base.__names__)
+
+        # take own items last
+        for name, item in dct.iteritems():
+            if isinstance(item, Item):
+                # set name if not already set by Item call
+                item.attach_name(name)
+                cls.__names__[item.name or name] = name
+
+    def __contains__(cls, name):
+        return name in cls.__names__
+
+    def __getitem__(cls, name):
+        if name in cls:
+            return getattr(cls, cls.__names__[name])
+
+        raise KeyError("`{}` not in {}".format(name, cls))
+
     def __iter__(cls):
-        return cls._children.iteritems()
+        for name in cls.__names__:
+            yield name, cls[name]
 
 
 class Node(object):
@@ -157,55 +168,46 @@ class Node(object):
 
     __metaclass__ = NodeMeta
 
-    # stores all child items, collected by __new__
-    _children = {}
-
     # the item this node was created by
-    _item = None
+    __item__ = None
 
     @property
-    def _name(self):
-        return self._item and self._item.name or None
+    def __name__(self):
+        return self.__item__ and self.__item__.name or None
 
     def __contains__(self, name):
-        return name in self._children
+        return name in self.__names__
 
     def __getitem__(self, name):
         """Returns a previously collected ``Item``, which will be a ``Node`` by descriptor magic."""
 
-        if name in self._children:
-            return self._children[name].__get__(self, self.__class__)
+        if name in self:
+            return getattr(self, self.__names__[name])
 
         raise KeyError("`{}` not in {}".format(name, self))
 
     def __iter__(self):
         """Iterates over all items and returns appropriate nodes."""
 
-        for name in self._children:
-            yield name, getattr(self, name)
+        for name in self.__names__:
+            yield name, self[name]
 
     def __repr__(self):
         """Represent a Node."""
 
-        return "<{n.__class__.__name__}:{n._name} [{items}]>"\
+        return "<{n.__class__.__name__}:{n.__name__} [{items}]>"\
             .format(
-                n=self, items=', '.join(sorted(self._children))
+                n=self, items=', '.join(sorted(name for name, _ in self))
             )
-
-    def get(self, name, default=None):
-        if name in self:
-            return self[name]
-
-        return default
 
 
 class Field(Node):
 
     """A ``Field`` describes the value of a ``Node``.
 
-    It can serialize and deserialize a value.
+    It can serialize and deserialize a value. An optional validator sanitizes
+    the value after deserializing it.
 
-    An optional validator sanitizes the value after deserializing it.
     """
 
     # create a validator in the Field
@@ -216,6 +218,7 @@ class Field(Node):
 
         :param validator: the validator to be used
         :param missing: action to be performed when the value is ``Undefined`` and therefor missing
+
         """
 
         if callable(validator):
@@ -228,7 +231,7 @@ class Field(Node):
         if 'missing' not in kwargs and kwargs.get('optional', False):
             self._missing = Ignore
 
-    def resolve_value(self, value, environment=None):
+    def _resolve_value(self, value, environment=None):
         """Resolve the value.
 
         Either apply missing or leave the value as is.
@@ -266,7 +269,7 @@ class Field(Node):
         bounced, since the mistake comes from there - use unittests for this!
 
         """
-        value = self.resolve_value(value, environment)
+        value = self._resolve_value(value, environment)
 
         return value
 
@@ -279,6 +282,6 @@ class Field(Node):
         :param value: the value to be deserialized
         :param environment: additional environment
         """
-        value = self.resolve_value(value, environment)
+        value = self._resolve_value(value, environment)
 
         return value

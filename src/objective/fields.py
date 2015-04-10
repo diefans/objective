@@ -16,7 +16,7 @@ class ListMixin(object):
             inst.__dict__['items'] = items.__get__(inst, cls)
         return inst
 
-    def traverse_children(self, value, environment=None):
+    def _traverse(self, value, environment=None):
         # items must be defined
         items = getattr(self, 'items')
 
@@ -34,7 +34,7 @@ class Set(core.Field, ListMixin):
         validated = super(Set, self).deserialize(value, environment)
 
         # traverse items and match against validated struct
-        collection = {item for item in self.traverse_children(validated, environment)}
+        collection = {item for item in self._traverse(validated, environment)}
 
         return collection
 
@@ -49,30 +49,32 @@ class List(core.Field, ListMixin):
         validated = super(List, self).deserialize(value, environment, validate=False)
 
         # traverse items and match against validated struct
-        collection = [item for item in self.traverse_children(validated, environment)]
+        collection = [item for item in self._traverse(validated, environment)]
 
         return collection
 
 
 class Mapping(core.Field):
 
-    """A ``Mapping`` resembles a dict like structure."""
+    """A ``Mapping`` resembles a :py:obj:`dict` like structure."""
 
-    def traverse_children(self, value, environment=None):
+    _type = dict
+
+    def _traverse(self, value, environment=None):
         """Traverse over all defined items and return a dictionary."""
 
-        for name, item in self:
-            yield name, item
+        # self is a good iterator
+        return self
 
     def serialize(self, value, environment=None):
 
         serialized = super(Mapping, self).serialize(value, environment)
 
-        mapping = {}
+        mapping = self._type()
 
         invalids = []
 
-        for name, item in self.traverse_children(serialized, environment):
+        for name, item in self._traverse(serialized, environment):
 
             # deserialize each item
             try:
@@ -105,11 +107,11 @@ class Mapping(core.Field):
         validated = super(Mapping, self).deserialize(value, environment, validate=False)
 
         # traverse items and match against validated struct
-        mapping = {}
+        mapping = self._type()
 
         invalids = []
 
-        for name, item in self.traverse_children(validated, environment):
+        for name, item in self._traverse(validated, environment):
 
             # deserialize each item
             try:
@@ -130,6 +132,13 @@ class Mapping(core.Field):
             raise exc.InvalidChildren(self, invalids)
 
         return mapping
+
+
+class BunchMapping(Mapping):
+
+    """Will de/serialize into a :py:class:`.values.Bunch`."""
+
+    _type = values.Bunch
 
 
 class Number(core.Field):

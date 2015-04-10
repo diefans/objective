@@ -13,6 +13,7 @@ from .fields import (
     Int,
     List,
     Mapping,
+    BunchMapping,
     Set,
     Unicode,
     UtcDateTime,

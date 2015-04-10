@@ -95,7 +95,7 @@ class TestFields(object):
         class S(objective.core.Node):
             foo = objective.Item(objective.Field)
 
-        assert isinstance(S.foo, objective.Item)
+        assert issubclass(S.foo, objective.core.Node)
 
         s = S()
 
@@ -326,7 +326,7 @@ def test_serialize_missing():
     with pytest.raises(objective.exc.InvalidChildren) as e:
         m.serialize(dct)
 
-    assert e.value.children[0].node._name == 'bar'
+    assert e.value.children[0].node.__name__ == 'bar'
     assert isinstance(e.value.children[0].value, objective.values.Undefined)
 
 
@@ -367,9 +367,9 @@ class TestNode(object):
         assert isinstance(s._bar, objective.core.Node)
         assert isinstance(s._sub, objective.core.Node)
         assert isinstance(s._sub.fom, objective.core.Node)
-        assert isinstance(Schema.foo, objective.Item)
+        assert issubclass(Schema.foo, objective.core.Node)
 
-    def test_name(self):
+    def test__name__(self):
         import objective.core
 
         class S(objective.core.Node):
@@ -379,8 +379,8 @@ class TestNode(object):
 
         s = S()
 
-        assert s.foo._name == 'foo'
-        assert s.bar._name == 'BAR'
+        assert s.foo.__name__ == 'foo'
+        assert s.bar.__name__ == 'BAR'
 
     def test_iter(self):
         import objective.core
@@ -411,9 +411,9 @@ class TestNode(object):
         class S4(S2, S3):
             bar = objective.Item(objective.core.Node)
 
-        assert 'foo' in S4._children
-        assert 'bar' in S4._children
-        assert 'bam' in S4._children
+        assert 'foo' in S4.__names__
+        assert 'bar' in S4.__names__
+        assert 'bam' in S4.__names__
 
     def test_getitem(self):
         import objective.core
@@ -469,3 +469,31 @@ def test_multiple_inheritance():
 
     assert [name for name, _ in C] == ["foo", "bar", "baz"]
     assert [name for name, _ in C()] == ["foo", "bar", "baz"]
+
+
+def test_steal_class():
+    import objective
+
+    class A(objective.Mapping):
+
+        @objective.Item()
+        class foo(objective.Mapping):
+            bar = objective.Item(objective.Unicode)
+
+    class B(objective.Mapping):
+
+        @objective.Item()
+        class foo(A.foo):
+            bar = objective.Item(objective.Unicode, missing=objective.Ignore)
+
+    assert issubclass(A().foo.bar._missing, objective.core.Missing)
+    assert issubclass(B().foo.bar._missing, objective.Ignore)
+
+
+def test_bunch():
+    import objective
+
+    class A(objective.BunchMapping):
+        foo = objective.Item(objective.Unicode)
+
+    assert A().deserialize({'foo': "bar"}).foo == 'bar'

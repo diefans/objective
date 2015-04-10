@@ -21,17 +21,17 @@ class InvalidValue(Invalid):
         self.node = node
         self.value = kwargs.pop("value", values.Undefined())
         self.message = msg or "Invalid value for `{name}`: {0.value}"\
-            .format(self, name=self.node_name)
+            .format(self, name=self.node__name__)
 
     def __repr__(self):
-        return "<{0.__class__.__name__}: {0.node_name} = {0.value}>"\
+        return "<{0.__class__.__name__}: {0.node__name__} = {0.value}>"\
             .format(self)
 
     @property
-    def node_name(self):
+    def node__name__(self):
         """Return the name of this node or its class name."""
 
-        return self.node._name or self.node.__class__.__name__              # pylint: disable=W0212
+        return self.node.__name__ or self.node.__class__.__name__              # pylint: disable=W0212
 
 
 class InvalidChildren(InvalidValue):
@@ -55,7 +55,7 @@ class InvalidChildren(InvalidValue):
 
     def error_dict(self):
         return {
-            tuple(x.node_name for x in path): invalid
+            tuple(x.node__name__ for x in path): invalid
             for path, invalid in self
         }
 
