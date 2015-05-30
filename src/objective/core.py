@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-from . import validation, exc, values
+from . import exc, values
 
 
 class Missing(object):
@@ -171,6 +171,10 @@ class Node(object):
     # the item this node was created by
     __item__ = None
 
+    def __init__(self):
+        # prepare children
+        self.__children__ = list(self)
+
     @property
     def __name__(self):
         return self.__item__ and self.__item__.name or None
@@ -211,7 +215,7 @@ class Field(Node):
     """
 
     # create a validator in the Field
-    # _validator = None
+    _validator = None
 
     def __init__(self, validator=None, **kwargs):
         """Optionally Assigns the validator.
@@ -220,8 +224,9 @@ class Field(Node):
         :param missing: action to be performed when the value is ``Undefined`` and therefor missing
 
         """
+        super(Field, self).__init__()
 
-        if callable(validator):
+        if validator is not None:
             setattr(self, "_validator", validator)
 
         # this is intentionally in kwargs, so we can also apply ``None`` for missing
@@ -241,7 +246,7 @@ class Field(Node):
         """
 
         # here we care about Undefined values
-        if isinstance(value, values.Undefined):
+        if value == values.Undefined:
             if isinstance(self._missing, type) and issubclass(self._missing, Missing):
                 # instantiate the missing thing
                 missing = self._missing(self, environment)
@@ -250,12 +255,17 @@ class Field(Node):
                 # the default is to raise a MissingValue() exception
                 value = missing(value)
 
-            elif callable(self._missing):
+            elif hasattr(self._missing, "__call__"):
                 value = self._missing()
 
             else:
                 # we just assign any value
                 value = self._missing
+
+        return value
+
+    def _serialize(self, value, environment=None):                # pylint: disable=R0201
+        """Serialization worker."""
 
         return value
 
@@ -271,9 +281,15 @@ class Field(Node):
         """
         value = self._resolve_value(value, environment)
 
+        value = self._serialize(value, environment)
+
         return value
 
-    @validation.validate
+    def _deserialize(self, value, environment=None):              # pylint: disable=R0201
+        """Derserialization worker method."""
+
+        return value
+
     def deserialize(self, value, environment=None):
         """Deserialize a value into a special application specific format or type.
 
@@ -282,6 +298,21 @@ class Field(Node):
         :param value: the value to be deserialized
         :param environment: additional environment
         """
+
         value = self._resolve_value(value, environment)
+
+        try:
+            value = self._deserialize(value, environment)
+
+            if self._validator is not None:
+                value = self._validator(self, value, environment)     # pylint: disable=E1102
+
+        except exc.InvalidValue:
+            # just reraise
+            raise
+
+        except (exc.Invalid, ValueError, TypeError):
+            # we convert a bare Invalid into InvalidValue
+            raise exc.InvalidValue(self, value=value)
 
         return value

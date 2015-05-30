@@ -2,10 +2,11 @@ from datetime import datetime
 from dateutil.parser import parse as dateutil_parse
 import pytz
 
-from . import core, exc, validation, values
+from collections import OrderedDict
+from . import core, exc, values
 
 
-class ListMixin(object):
+class CollectionMixin(object):
     items = core.Item(core.Field)
 
     def __new__(cls, items=None, **kwargs):
@@ -16,40 +17,29 @@ class ListMixin(object):
             inst.__dict__['items'] = items.__get__(inst, cls)
         return inst
 
-    def _traverse(self, value, environment=None):
-        # items must be defined
-        items = getattr(self, 'items')
 
-        for item in value:
-            yield items.deserialize(item, environment)
+class Set(core.Field, CollectionMixin):
 
-
-class Set(core.Field, ListMixin):
-
-    @validation.validate
-    def deserialize(self, value, environment=None):
+    def _deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value."""
 
-        # first invoke super validation
-        validated = super(Set, self).deserialize(value, environment)
+        items = self.items
 
         # traverse items and match against validated struct
-        collection = {item for item in self._traverse(validated, environment)}
+        collection = {items.deserialize(subvalue, environment) for subvalue in value}
 
         return collection
 
 
-class List(core.Field, ListMixin):
+class List(core.Field, CollectionMixin):
 
-    @validation.validate
-    def deserialize(self, value, environment=None):
+    def _deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value."""
 
-        # first invoke super validation
-        validated = super(List, self).deserialize(value, environment, validate=False)
+        items = self.items
 
         # traverse items and match against validated struct
-        collection = [item for item in self._traverse(validated, environment)]
+        collection = [items.deserialize(subvalue, environment) for subvalue in value]
 
         return collection
 
@@ -60,26 +50,18 @@ class Mapping(core.Field):
 
     _type = dict
 
-    def _traverse(self, value, environment=None):
-        """Traverse over all defined items and return a dictionary."""
-
-        # self is a good iterator
-        return self
-
-    def serialize(self, value, environment=None):
-
-        serialized = super(Mapping, self).serialize(value, environment)
+    def _serialize(self, value, environment=None):
 
         mapping = self._type()
 
         invalids = []
 
-        for name, item in self._traverse(serialized, environment):
+        for name, item in self.__children__:
 
             # deserialize each item
             try:
                 mapping[name] = item.serialize(
-                    serialized.get(name, values.Undefined()), environment
+                    value.get(name, values.Undefined), environment
                 )
 
             except exc.IgnoreValue:
@@ -96,27 +78,23 @@ class Mapping(core.Field):
 
         return mapping
 
-    @validation.validate
-    def deserialize(self, value, environment=None):
+    def _deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value.
 
         :param value: a ``dict`` wich contains mapped values
         """
-
-        # first invoke super validation
-        validated = super(Mapping, self).deserialize(value, environment, validate=False)
 
         # traverse items and match against validated struct
         mapping = self._type()
 
         invalids = []
 
-        for name, item in self._traverse(validated, environment):
+        for name, item in self.__children__:
 
             # deserialize each item
             try:
                 mapping[name] = item.deserialize(
-                    validated.get(name, values.Undefined()), environment
+                    value.get(name, values.Undefined), environment
                 )
 
             except exc.IgnoreValue:
@@ -141,16 +119,20 @@ class BunchMapping(Mapping):
     _type = values.Bunch
 
 
+class OrderedMapping(Mapping):
+
+    """A :py:class:OrderedDict result."""
+
+    _type = OrderedDict
+
+
 class Number(core.Field):
 
     """Represents a numeric value ``float`` or ``int``."""
 
     types = (int, float)
 
-    @validation.validate
-    def deserialize(self, value, environment=None):
-        value = super(Number, self).deserialize(value, environment, validate=False)
-
+    def _deserialize(self, value, environment=None):
         for _type in self.types:
             try:
                 casted = _type(value)
@@ -188,25 +170,19 @@ class Unicode(core.Field):
 
     encoding = "utf-8"
 
-    @validation.validate
-    def deserialize(self, value, environment=None):
-        value = super(Unicode, self).deserialize(value, environment, validate=False)
-
+    def _deserialize(self, value, environment=None):
         # ensure we have a unicode afterwards
-        if isinstance(value, unicode):
-            pass
 
-        elif isinstance(value, str):
+        try:
             value = unicode(value, self.encoding)
 
-        else:
+        except TypeError:
+            # may be we have an integer or another number
             value = unicode(value)
 
         return value
 
     def serialize(self, value, environment=None):
-        value = super(Unicode, self).serialize(value, environment)
-
         return value.encode(self.encoding)
 
 
@@ -220,10 +196,7 @@ class UtcDateTime(core.Field):
 
     """Represents a datetime string in UTC."""
 
-    @validation.validate
-    def deserialize(self, value, environment=None):
-        value = super(UtcDateTime, self).deserialize(value, environment, validate=False)
-
+    def _deserialize(self, value, environment=None):
         # test for a timestamp
         if isinstance(value, basestring):
             # try utc datetime string
@@ -239,5 +212,4 @@ class UtcDateTime(core.Field):
         raise exc.InvalidValue(self, "Invalid DateTime", value)
 
     def serialize(self, value, environment=None):
-        value = super(UtcDateTime, self).serialize(value, environment)
         return str(value)

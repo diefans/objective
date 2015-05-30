@@ -1,36 +1,6 @@
-import functools
-
 import validate_email
 
 from . import exc
-
-
-def validate(meth):
-    """Decorate a deserialize function with a validator."""
-
-    @functools.wraps(meth)
-    def wrapper(self, value, environment=None, validate=True):      # pylint: disable=W0621
-        # get deserialize value
-        value = meth(self, value, environment)
-
-        # we disable validation on demand
-        # this is useful when calling the super class deserialize method
-        validator = getattr(self, '_validator', None)
-        if validate and callable(validator):   # pylint: disable=W0212
-            try:
-                value = validator(self, value, environment)     # pylint: disable=W0212
-
-            except exc.InvalidValue:
-                # just reraise
-                raise
-
-            except exc.Invalid:
-                # we convert a bare Invalid into InvalidValue
-                raise exc.InvalidValue(self, value=value)
-
-        return value
-
-    return wrapper
 
 
 class Validator(object):

@@ -311,7 +311,7 @@ def test_serialize():
     assert m.serialize(dct) == {'foo': {'bar': set([1, 2, 3]), 'baz': [{'x': 1}, {'x': 2}]}}
 
 
-def test_serialize_missing():
+def test_serialize_missing_ignore():
     import objective
     import objective.values
     import objective.exc
@@ -321,13 +321,14 @@ def test_serialize_missing():
     class M(objective.Mapping):
         foo = objective.Item(objective.Field)
         bar = objective.Item(objective.Field)
+        baz = objective.Item(objective.Field, missing=objective.Ignore)
 
     m = M()
     with pytest.raises(objective.exc.InvalidChildren) as e:
         m.serialize(dct)
 
     assert e.value.children[0].node.__name__ == 'bar'
-    assert isinstance(e.value.children[0].value, objective.values.Undefined)
+    assert e.value.children[0].value == objective.values.Undefined
 
 
 class TestDateTime(object):
@@ -497,3 +498,24 @@ def test_bunch():
         foo = objective.Item(objective.Unicode)
 
     assert A().deserialize({'foo': "bar"}).foo == 'bar'
+
+
+def test_unicode():
+    import objective
+
+    u = objective.Unicode()
+
+    assert type(u.deserialize("abc")) == unicode
+    assert type(u.deserialize(123)) == unicode
+
+    assert u.serialize(u"123") == "123"
+
+
+def test_utc():
+    import objective
+    import datetime
+
+    utc = objective.UtcDateTime()
+
+    assert utc.deserialize("2001-09-11 10:42:03") == datetime.datetime(2001, 9, 11, 10, 42, 3)
+    assert utc.serialize(datetime.datetime(2001, 9, 11, 10, 42, 3)) == '2001-09-11 10:42:03'
