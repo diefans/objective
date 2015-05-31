@@ -7,6 +7,7 @@ from setuptools.command.test import test as TestCommand
 
 __version__ = "0.0.5"
 
+
 class PyTest(TestCommand):
     """Our test runner."""
 
@@ -31,11 +32,15 @@ class PyTest(TestCommand):
 
 setup(
     name="objective",
+    author="Oliver Berger",
+    author_email="diefans@gmail.com",
+    url="https://github.com/diefans/objective",
+    description="declaraive de/serialization of python structures",
     version=__version__,
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
-        'License :: Unlicense',
+        'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python',
     ],
 
