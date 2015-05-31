@@ -5,6 +5,7 @@ import sys
 from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 
+__version__ = "0.0.4"
 
 class PyTest(TestCommand):
     """Our test runner."""
@@ -30,7 +31,7 @@ class PyTest(TestCommand):
 
 setup(
     name="objective",
-    version="0.0.4",
+    version=__version__,
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
