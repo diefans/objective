@@ -49,6 +49,7 @@ def test_optional():
 
 def test_invalid_generator():
     import objective
+    import six
 
     class M(objective.Mapping):
         foo = objective.Item(objective.Field)
@@ -74,7 +75,7 @@ def test_invalid_generator():
         M().deserialize({'bar': {'bar2': {}}})
 
     errors = {path: invalid.message
-              for path, invalid in err.value.error_dict().iteritems()}
+              for path, invalid in six.iteritems(err.value.error_dict())}
 
     assert errors == {
         ('foo',): 'Value for `foo` is missing!',
@@ -173,10 +174,14 @@ class TestFields(object):
         with pytest.raises(objective.Invalid) as ex:
             m.deserialize({'bam': {}})
 
+        # order is not sure
         assert isinstance(ex.value, objective.exc.InvalidChildren)
-        assert ex.value.children[0].node == m.bam
-        assert ex.value.children[0].children[0].node == m.bam.foo
-        assert ex.value.children[1].node == m.bar
+
+        ex_nodes = {c.node for c in ex.value.children}
+
+        assert m.bam in ex_nodes
+        assert m.bar in ex_nodes
+        # assert ex.value.children[0].children[0].node == m.bam.foo
 
 
 class TestNumber(object):
@@ -439,7 +444,7 @@ class TestNode(object):
         with pytest.raises(KeyError) as ex:
             s['bam']['missing']         # pylint: disable=W0104
 
-        assert ex.value.message == '`missing` not in <bar:bam [baz, bim]>'
+        assert ex.value.args == ('`missing` not in <bar:bam [baz, bim]>',)
 
 
 def test_body_missing_bug():
@@ -502,13 +507,14 @@ def test_bunch():
 
 def test_unicode():
     import objective
+    import six
 
     u = objective.Unicode()
 
-    assert type(u.deserialize("abc")) == unicode
-    assert type(u.deserialize(123)) == unicode
+    assert type(u.deserialize("abc")) == six.text_type
+    assert type(u.deserialize(123)) == six.text_type
 
-    assert u.serialize(u"123") == "123"
+    assert u.serialize(six.text_type("123")) == "123"
 
 
 def test_utc():

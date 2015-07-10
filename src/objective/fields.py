@@ -1,8 +1,11 @@
 from datetime import datetime
+from collections import OrderedDict
+
+import six
+
 from dateutil.parser import parse as dateutil_parse
 import pytz
 
-from collections import OrderedDict
 from . import core, exc, values
 
 
@@ -10,7 +13,7 @@ class CollectionMixin(object):
     items = core.Item(core.Field)
 
     def __new__(cls, items=None, **kwargs):
-        inst = core.Field.__new__(cls, items=items, **kwargs)
+        inst = super(CollectionMixin, cls).__new__(cls)
 
         # inject items only for the instance if it is defined
         if items is not None:
@@ -174,11 +177,11 @@ class Unicode(core.Field):
         # ensure we have a unicode afterwards
 
         try:
-            value = unicode(value, self.encoding)
+            value = six.text_type(value, self.encoding)
 
         except TypeError:
             # may be we have an integer or another number
-            value = unicode(value)
+            value = six.text_type(value)
 
         return value
 
@@ -198,7 +201,7 @@ class UtcDateTime(core.Field):
 
     def _deserialize(self, value, environment=None):
         # test for a timestamp
-        if isinstance(value, basestring):
+        if isinstance(value, six.string_types):
             # try utc datetime string
             return dateutil_parse(value)
 

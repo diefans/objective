@@ -1,5 +1,7 @@
 from collections import OrderedDict
 
+import six
+
 from . import exc, values
 
 
@@ -36,6 +38,8 @@ class Item(object):
 
     """Declares an item of a mapping to be instantiated."""
 
+    __nodes__ = []
+
     def __init__(self, node_class=None, name=None, *args, **kwargs):
         """Prepares node class instantiation.
 
@@ -48,12 +52,25 @@ class Item(object):
         # the instance of the node this item has created
         # this will later be created and returned by the descriptor
         self.node = None
+        self._node_class = None
 
-        self.node_class = node_class
+        if node_class is not None:
+            self.node_class = node_class
+
         self.name = name
 
         self.node_args = args
         self.node_kwargs = kwargs
+
+    @property
+    def node_class(self):
+        return self._node_class
+
+    @node_class.setter
+    def node_class(self, cls):
+        # register node class also in Item index, so we know the order
+        self.__nodes__.append(cls)
+        self._node_class = cls
 
     def __get__(self, obj, cls=None):
         """Resolve the ``Node`` instance or return the ``Item`` instance."""
@@ -142,7 +159,7 @@ class NodeMeta(type):
                     cls.__names__.update(base.__names__)
 
         # take own items last
-        for name, item in dct.iteritems():
+        for name, item in six.iteritems(dct):
             if isinstance(item, Item):
                 # set name if not already set by Item call
                 item.attach_name(name)
@@ -162,11 +179,9 @@ class NodeMeta(type):
             yield name, cls[name]
 
 
-class Node(object):
+class Node(six.with_metaclass(NodeMeta)):
 
     """A node of a tree like structure, which serves as a blueprint for value examination."""
-
-    __metaclass__ = NodeMeta
 
     # the item this node was created by
     __item__ = None
