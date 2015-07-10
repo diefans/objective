@@ -514,7 +514,11 @@ def test_unicode():
     assert type(u.deserialize("abc")) == six.text_type
     assert type(u.deserialize(123)) == six.text_type
 
-    assert u.serialize(six.text_type("123")) == "123"
+    v = u.serialize(six.text_type("123"))
+
+    from pdb import set_trace; set_trace()       # XXX BREAKPOINT
+
+    assert v == "123"
 
 
 def test_utc():
