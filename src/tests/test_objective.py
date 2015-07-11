@@ -531,3 +531,36 @@ def test_utc():
 
     assert utc.deserialize("2001-09-11 10:42:03") == datetime.datetime(2001, 9, 11, 10, 42, 3)
     assert utc.serialize(datetime.datetime(2001, 9, 11, 10, 42, 3)) == '2001-09-11 10:42:03'
+
+
+def test_schema():
+    import objective
+
+    class RegisterUserObjective(objective.BunchMapping):
+        @objective.Item()
+        class body(objective.BunchMapping):
+            email = objective.Item(objective.Unicode, validator=objective.Email())
+            # TODO make password min length and some uppercase and digits
+            password = objective.Item(objective.Unicode, missing=objective.Ignore)
+
+    class LoginUserObjective(objective.BunchMapping):
+        @objective.Item()
+        class body(RegisterUserObjective.body):
+            # just enforce password
+            password = objective.Item(objective.Unicode)
+
+    o = LoginUserObjective()
+
+    s = o.deserialize({
+        'body': {
+            'password': "foo",
+            "email": "foo@example.com"
+        }
+    })
+
+    assert s == {
+        'body': {
+            'password': "foo",
+            "email": "foo@example.com"
+        }
+    }

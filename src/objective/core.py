@@ -322,7 +322,7 @@ class Field(Node):
             if self._validator is not None:
                 value = self._validator(self, value, environment)     # pylint: disable=E1102
 
-        except exc.InvalidValue:
+        except exc.InvalidValue as ex:
             # just reraise
             raise
 

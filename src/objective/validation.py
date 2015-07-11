@@ -1,3 +1,5 @@
+import six
+
 import validate_email
 
 from . import exc
@@ -55,7 +57,7 @@ class Email(Validator):
         self.verify = verify
 
     def __call__(self, node, value, environment=None):
-        if isinstance(value, basestring):
+        if isinstance(value, six.string_types):
             if validate_email.validate_email(
                     value,
                     check_mx=self.check_mx,
