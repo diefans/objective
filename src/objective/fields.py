@@ -186,6 +186,7 @@ class Unicode(core.Field):
         return value
 
     def serialize(self, value, environment=None):
+        from ipdb import set_trace; set_trace()       # XXX BREAKPOINT
         return value.encode(self.encoding)
 
 

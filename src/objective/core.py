@@ -296,6 +296,7 @@ class Field(Node):
         """
         value = self._resolve_value(value, environment)
 
+        from ipdb import set_trace; set_trace()       # XXX BREAKPOINT
         value = self._serialize(value, environment)
 
         return value
