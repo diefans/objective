@@ -60,7 +60,6 @@ class Mapping(core.Field):
         invalids = []
 
         for name, item in self.__children__:
-
             # deserialize each item
             try:
                 mapping[name] = item.serialize(
@@ -185,9 +184,8 @@ class Unicode(core.Field):
 
         return value
 
-    def serialize(self, value, environment=None):
-        from ipdb import set_trace; set_trace()       # XXX BREAKPOINT
-        return value.encode(self.encoding)
+    def _serialize(self, value, environment=None):
+        return six.text_type(value)
 
 
 def totimestamp(dt, epoch=datetime(1970, 1, 1, tzinfo=pytz.utc)):
@@ -215,5 +213,5 @@ class UtcDateTime(core.Field):
 
         raise exc.InvalidValue(self, "Invalid DateTime", value)
 
-    def serialize(self, value, environment=None):
-        return str(value)
+    def _serialize(self, value, environment=None):
+        return six.text_type(value)
