@@ -313,7 +313,7 @@ def test_serialize():
 
     m = M()
 
-    assert m.serialize(dct) == {'foo': {'bar': set([1, 2, 3]), 'baz': [{'x': 1}, {'x': 2}]}}
+    assert m.serialize(dct) == {'foo': {'bar': ['1', '2', '3'], 'baz': [{'x': 1}, {'x': 2}]}}
 
 
 def test_serialize_missing_ignore():

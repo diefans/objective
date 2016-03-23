@@ -20,8 +20,18 @@ class CollectionMixin(object):
             inst.__dict__['items'] = items.__get__(inst, cls)
         return inst
 
+    def _serialize(self, value, environment=None):
+        value = super(CollectionMixin, self)._serialize(value, environment)
 
-class Set(core.Field, CollectionMixin):
+        items = self.items
+
+        # traverse items and match against validated struct
+        collection = [items.serialize(subvalue, environment) for subvalue in value]
+
+        return collection
+
+
+class Set(CollectionMixin, core.Field):
 
     def _deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value."""
@@ -34,7 +44,7 @@ class Set(core.Field, CollectionMixin):
         return collection
 
 
-class List(core.Field, CollectionMixin):
+class List(CollectionMixin, core.Field):
 
     def _deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value."""
