@@ -53,9 +53,19 @@ class Mapping(core.Field):
 
     _type = dict
 
+    def _create_serialize_type(self, value, environment=None):
+        """Resolve the type for serialization."""
+
+        return self._type()
+
+    def _create_deserialize_type(self, value, environment=None):
+        """Resolve the type for deserialization."""
+
+        return self._type()
+
     def _serialize(self, value, environment=None):
 
-        mapping = self._type()
+        mapping = self._create_serialize_type(value, environment)
 
         invalids = []
 
@@ -87,7 +97,7 @@ class Mapping(core.Field):
         """
 
         # traverse items and match against validated struct
-        mapping = self._type()
+        mapping = self._create_deserialize_type(value, environment)
 
         invalids = []
 
