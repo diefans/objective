@@ -246,7 +246,7 @@ class Node(six.with_metaclass(NodeMeta)):
         """Iterates over all items and returns appropriate nodes."""
 
         for name in self.__names__:
-            yield name, self[name]
+            yield name, getattr(self, self.__names__[name])
 
     def __repr__(self):
         """Represent a Node."""
