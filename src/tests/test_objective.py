@@ -560,3 +560,19 @@ def test_schema():
             "email": "foo@example.com"
         }
     }
+
+
+def test_order():
+    import objective
+
+    class Foo(objective.Mapping):
+        _1 = objective.Item(objective.Field)
+        _2 = objective.Item(objective.Field)
+        _3 = objective.Item(objective.Field)
+
+    class Bar(Foo):
+        _4 = objective.Item(objective.Field)
+        _1 = objective.Item(objective.Field)
+
+    bar = Bar()
+    assert [name for name, node in bar] == ['_1', '_2', '_3', '_4']

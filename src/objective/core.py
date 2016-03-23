@@ -1,8 +1,30 @@
+import functools
 from collections import OrderedDict
 
 import six
 
 from . import exc, values
+
+
+class reify(object):
+
+    """
+    create a property and set value into instance dict
+    https://github.com/Pylons/pyramid/blob/master/pyramid/decorator.py
+    """
+
+    def __init__(self, wrapped):
+        self.wrapped = wrapped
+        functools.update_wrapper(self, wrapped)
+
+    def __get__(self, inst, objtype=None):
+        if inst is None:
+            return self
+
+        val = self.wrapped(inst)
+        setattr(inst, self.wrapped.__name__, val)
+
+        return val
 
 
 class Missing(object):
@@ -38,7 +60,15 @@ class Item(object):
 
     """Declares an item of a mapping to be instantiated."""
 
-    __nodes__ = []
+    __items__ = []
+    """Remembers the order of :py:obj:`Item` instantiation."""
+
+    def __new__(cls, *args, **kwargs):
+        inst = super(Item, cls).__new__(cls, *args, **kwargs)
+
+        cls.__items__.append(inst)
+
+        return inst
 
     def __init__(self, node_class=None, name=None, *args, **kwargs):
         """Prepares node class instantiation.
@@ -51,7 +81,6 @@ class Item(object):
         """
         # the instance of the node this item has created
         # this will later be created and returned by the descriptor
-        self.node = None
         self._node_class = None
 
         if node_class is not None:
@@ -68,8 +97,6 @@ class Item(object):
 
     @node_class.setter
     def node_class(self, cls):
-        # register node class also in Item index, so we know the order
-        self.__nodes__.append(cls)
         self._node_class = cls
 
     def __get__(self, obj, cls=None):
@@ -78,9 +105,6 @@ class Item(object):
         if obj is None:
             # return the node class if accessed over class
             return self.node_class
-
-        if self.node is None:
-            self.node = self.create_node()
 
         return self.node
 
@@ -109,7 +133,14 @@ class Item(object):
         if not self.name:
             self.name = name
 
-    def create_node(self):
+    @property
+    def index(self):
+        """:returns: the index of creation of this item."""
+
+        return self.__items__.index(self)
+
+    @reify
+    def node(self):
         """Create a :py:class:`Node` instance.
 
         All args and kwargs are forwarded to the node.
@@ -158,8 +189,14 @@ class NodeMeta(type):
                 if issubclass(base, cls.__node_base__):
                     cls.__names__.update(base.__names__)
 
+        def key(name_item):
+            return name_item[1].index
+
         # take own items last
-        for name, item in six.iteritems(dct):
+        for name, item in sorted(
+                (name_item for name_item in six.iteritems(dct) if isinstance(name_item[1], Item)),
+                key=key
+        ):
             if isinstance(item, Item):
                 # set name if not already set by Item call
                 item.attach_name(name)
