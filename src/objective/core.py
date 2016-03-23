@@ -1,3 +1,10 @@
+"""
+The basic idea behind objective is to build a tree like structure in terms of classes and descriptors which resolve
+either the :py:obj:`Item` or the :py:obj:`Node`.
+
+De/serialization is done by traversing over the tree and take the
+"""
+
 import functools
 from collections import OrderedDict
 
@@ -36,7 +43,7 @@ class Missing(object):
         self.environment = environment
 
     def __call__(self, value):
-        """Just raise a ``MissingValue`` exception."""
+        """Just raise a `MissingValue` exception."""
 
         raise exc.MissingValue(
             self.node,
@@ -79,25 +86,10 @@ class Item(object):
         :param kwargs: additional keyword arguments for the node instantiation
 
         """
-        # the instance of the node this item has created
-        # this will later be created and returned by the descriptor
-        self._node_class = None
-
-        if node_class is not None:
-            self.node_class = node_class
-
+        self.node_class = node_class
         self.name = name
-
         self.node_args = args
         self.node_kwargs = kwargs
-
-    @property
-    def node_class(self):
-        return self._node_class
-
-    @node_class.setter
-    def node_class(self, cls):
-        self._node_class = cls
 
     def __get__(self, obj, cls=None):
         """Resolve the ``Node`` instance or return the ``Item`` instance."""
@@ -116,8 +108,7 @@ class Item(object):
         return self
 
     def __repr__(self):
-        return "<{0.__class__.__name__}: {0.name} = {0.node}>"\
-            .format(self)
+        return "<{0.__class__.__name__}: {0.name} = {0.node}>".format(self)
 
     def attach_name(self, name):
         """Attach a name to an item.
@@ -148,15 +139,14 @@ class Item(object):
         :returns: a :py:class:`Node` instance
         """
 
-        if self.node_class is not None:
-            node = self.node_class(*self.node_args, **self.node_kwargs)
+        if self.node_class is None:
+            raise ValueError("You have to create an ``Item`` by calling ``__init__`` with ``node_class`` argument"
+                             " or by decorating a ``Node`` class.")
 
-            node.__item__ = self
+        node = self.node_class(*self.node_args, **self.node_kwargs)
+        node.__item__ = self
 
-            return node
-
-        raise ValueError("You have to create an ``Item`` by calling ``__init__`` with ``node_class`` argument"
-                         " or by decorating a ``Node`` class.")
+        return node
 
 
 class NodeMeta(type):
@@ -193,14 +183,14 @@ class NodeMeta(type):
             return name_item[1].index
 
         # take own items last
-        for name, item in sorted(
+        for node_name, item in sorted(
                 (name_item for name_item in six.iteritems(dct) if isinstance(name_item[1], Item)),
                 key=key
         ):
             if isinstance(item, Item):
                 # set name if not already set by Item call
-                item.attach_name(name)
-                cls.__names__[item.name or name] = name
+                item.attach_name(node_name)
+                cls.__names__[item.name or node_name] = node_name
 
     def __contains__(cls, name):
         return name in cls.__names__
@@ -213,7 +203,7 @@ class NodeMeta(type):
 
     def __iter__(cls):
         for name in cls.__names__:
-            yield name, cls[name]
+            yield name, getattr(cls, cls.__names__[name])
 
 
 class Node(six.with_metaclass(NodeMeta)):
@@ -222,10 +212,6 @@ class Node(six.with_metaclass(NodeMeta)):
 
     # the item this node was created by
     __item__ = None
-
-    def __init__(self):
-        # prepare children
-        self.__children__ = list(self)
 
     @property
     def __name__(self):
@@ -345,7 +331,7 @@ class Field(Node):
     def deserialize(self, value, environment=None):
         """Deserialize a value into a special application specific format or type.
 
-        ``value`` can be ``Missing``, ``None`` or something else.
+        `value` can be `Missing`, `None` or something else.
 
         :param value: the value to be deserialized
         :param environment: additional environment

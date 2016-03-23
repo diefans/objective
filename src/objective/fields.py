@@ -79,8 +79,8 @@ class Mapping(core.Field):
 
         invalids = []
 
-        for name, item in self.__children__:
-            # deserialize each item
+        for name, item in self:
+            # serialize each item
             try:
                 mapping[name] = item.serialize(
                     value.get(name, values.Undefined), environment
@@ -111,7 +111,7 @@ class Mapping(core.Field):
 
         invalids = []
 
-        for name, item in self.__children__:
+        for name, item in self:
 
             # deserialize each item
             try:

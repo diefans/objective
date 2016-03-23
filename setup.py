@@ -35,7 +35,7 @@ setup(
     author="Oliver Berger",
     author_email="diefans@gmail.com",
     url="https://github.com/diefans/objective",
-    description="declaraive de/serialization of python structures",
+    description="declarative de/serialization of python structures",
     version=__version__,
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -59,6 +59,7 @@ setup(
         "pytest",
         "pytest-random",
         "pytest-pep8",
+        "pytest-cov"
     ],
     cmdclass={'test': PyTest},
 )

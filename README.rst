@@ -1,11 +1,17 @@
 objective
 =========
 
+As a result of frustration working with colander, I decided to create something similar...
+
 Objective is a de/serialization tool with following features:
 
 - declarative definition of objectives.
+- no confusion about how to define something, it is always the same.
 - reuse definitions by inheritance.
 - optional validation.
+- make it simple to override certain parts.
+
+
 
 Usage
 -----
