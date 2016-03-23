@@ -44,7 +44,7 @@ setup(
         'Programming Language :: Python',
     ],
 
-    keywords="serialization deserialization validation suckless",
+    keywords="serialization deserialization serialize deserialize declarative object validation suckless",
 
     packages=find_packages('src'),
     package_dir={'': 'src'},
