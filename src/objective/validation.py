@@ -66,3 +66,59 @@ class Email(Validator):
                 return value
 
         raise exc.Invalid()
+
+
+class ValueMap(Validator):
+
+    """Map certain values to other values."""
+
+    def __init__(self, map_values, **kwargs):
+        self.map_values = map_values
+
+        if 'default' in kwargs:
+            self.default = kwargs.get('default')
+
+    def __call__(self, node, value, environment=None):
+        if callable(self.map_values):
+            value = self.map_values(value)
+
+        else:
+            # assume dict
+            try:
+                value = self.map_values[value]
+            except KeyError:
+                if 'default' not in self.__dict__:
+                    raise exc.Invalid()
+
+                value = self.default
+
+        return value
+
+
+class Chain(Validator):
+
+    """Chains a set of validators."""
+
+    def __init__(self, *validators):
+        self.validators = validators
+
+    def __call__(self, node, value, environment=None):
+        for validator in self.validators:
+            value = validator(node, value, environment=environment)
+
+        return value
+
+
+class FieldValue(Validator):
+
+    """Deserialize the value by field."""
+
+    def __init__(self, field):
+        self.field_class = field
+
+    def __call__(self, node, value, environment=None):
+        field = self.field_class(environment=environment)
+
+        value = field.deserialize(value)
+
+        return value

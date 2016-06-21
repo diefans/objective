@@ -6,6 +6,9 @@ from .validation import (
     OneOf,
     NoneOf,
     Email,
+    ValueMap,
+    Chain,
+    FieldValue,
 )
 from .fields import (
     Number,

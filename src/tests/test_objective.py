@@ -578,21 +578,21 @@ def test_order():
     assert [name for name, node in bar] == ['_1', '_2', '_3', '_4']
 
 
-@pytest.mark.parametrize("value,result", [
-    ("y", True),
-    ("n", False),
-    ("yes", True),
-    ("true", True),
+@pytest.mark.parametrize('value,result', [
+    ('y', True),
+    ('n', False),
+    ('yes', True),
+    ('true', True),
     (True, True),
     (False, False),
-    ("Enabled", True),
-    ("1", True),
-    ("0", False),
+    ('Enabled', True),
+    ('1', True),
+    ('0', False),
     (1, True),
     (0, False),
-    ("t", True),
-    ("On", True),
-    ("foo", False)
+    ('t', True),
+    ('On', True),
+    ('foo', False)
 
 ])
 def test_bool(value, result):
@@ -602,3 +602,32 @@ def test_bool(value, result):
     s = o.deserialize(value)
 
     assert s == result
+
+
+@pytest.mark.parametrize('value,result', [
+    (True, '0'),
+    (False, '1'),
+    (None, '2'),
+])
+def test_value_map(value, result):
+    import objective
+
+    v = objective.ValueMap({True: '0', False: '1'}, default='2')
+
+    assert v(None, value) == result
+
+
+@pytest.mark.parametrize('value,result', [
+    (True, False),
+    (False, True),
+    (None, False),
+])
+def test_chain(value, result):
+    import objective
+
+    v = objective.Chain(
+        objective.ValueMap({True: 'False', False: 'On'}, default='2'),
+        objective.FieldValue(objective.Bool)
+    )
+
+    assert v(None, value) == result
