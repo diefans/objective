@@ -235,3 +235,21 @@ class UtcDateTime(core.Field):
 
     def _serialize(self, value, environment=None):
         return six.text_type(value)
+
+
+_truth = frozenset(('yes', 'enabled', 'true', '1', 't', 'on', 'y'))
+
+
+class Bool(core.Field):
+
+    """Represents a boolean value."""
+
+    def _deserialize(self, value, environment=None):
+        if value is None:
+            return False
+
+        if isinstance(value, bool):
+            return value
+
+        # convert string values to boolean
+        return six.text_type(value).strip().lower() in _truth

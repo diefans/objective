@@ -17,4 +17,5 @@ from .fields import (
     Set,
     Unicode,
     UtcDateTime,
+    Bool,
 )

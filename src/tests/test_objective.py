@@ -576,3 +576,29 @@ def test_order():
 
     bar = Bar()
     assert [name for name, node in bar] == ['_1', '_2', '_3', '_4']
+
+
+@pytest.mark.parametrize("value,result", [
+    ("y", True),
+    ("n", False),
+    ("yes", True),
+    ("true", True),
+    (True, True),
+    (False, False),
+    ("Enabled", True),
+    ("1", True),
+    ("0", False),
+    (1, True),
+    (0, False),
+    ("t", True),
+    ("On", True),
+    ("foo", False)
+
+])
+def test_bool(value, result):
+    import objective
+
+    o = objective.Bool()
+    s = o.deserialize(value)
+
+    assert s == result
