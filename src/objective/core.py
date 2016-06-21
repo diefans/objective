@@ -349,8 +349,8 @@ class Field(Node):
             # just reraise
             raise
 
-        except (exc.Invalid, ValueError, TypeError):
+        except (exc.Invalid, ValueError, TypeError) as ex:
             # we convert a bare Invalid into InvalidValue
-            raise exc.InvalidValue(self, value=value)
+            raise exc.InvalidValue(self, value=value, origin=ex)
 
         return value
