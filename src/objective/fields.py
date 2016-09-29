@@ -11,6 +11,11 @@ from . import core, exc, values
 
 class CollectionMixin(object):
     items = core.Item(core.Field)
+    collection_type = list
+
+    @staticmethod
+    def collection_pusher(col, x):
+        col.append(x)
 
     def __new__(cls, items=None, **kwargs):
         inst = super(CollectionMixin, cls).__new__(cls)
@@ -30,31 +35,40 @@ class CollectionMixin(object):
 
         return collection
 
-
-class Set(CollectionMixin, core.Field):
-
     def _deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value."""
 
-        items = self.items
+        items_class = self.items.__class__
+        invalids = []
 
         # traverse items and match against validated struct
-        collection = {items.deserialize(subvalue, environment) for subvalue in value}
+        collection = self.collection_type()
+
+        for i, subvalue in enumerate(value):
+            item = items_class(name=i)
+            try:
+                self.collection_pusher(collection, item.deserialize(subvalue, environment=environment))
+
+            except exc.Invalid as ex:
+                invalids.append(ex)
+
+        if invalids:
+            # on invalids this item is also ``Invalid``
+            raise exc.InvalidChildren(self, invalids)
 
         return collection
+
+
+class Set(CollectionMixin, core.Field):
+    collection_type = set
+
+    @staticmethod
+    def collection_pusher(col, x):
+        col.add(x)
 
 
 class List(CollectionMixin, core.Field):
-
-    def _deserialize(self, value, environment=None):
-        """A collection traverses over something to deserialize its value."""
-
-        items = self.items
-
-        # traverse items and match against validated struct
-        collection = [items.deserialize(subvalue, environment) for subvalue in value]
-
-        return collection
+    pass
 
 
 class Mapping(core.Field):

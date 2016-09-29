@@ -31,7 +31,8 @@ class InvalidValue(Invalid):
     def node__name__(self):
         """Return the name of this node or its class name."""
 
-        return self.node.__name__ or self.node.__class__.__name__              # pylint: disable=W0212
+        return self.node.__name__ \
+            if self.node.__name__ is not None else self.node.__class__.__name__              # pylint: disable=W0212
 
 
 class InvalidChildren(InvalidValue):

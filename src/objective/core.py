@@ -213,9 +213,15 @@ class Node(six.with_metaclass(NodeMeta)):
     # the item this node was created by
     __item__ = None
 
+    def __init__(self, name=None, **kwargs):
+        super(Node, self).__init__()
+
+        # only to override the name of that node for collections
+        self._name = name
+
     @property
     def __name__(self):
-        return self.__item__ and self.__item__.name or None
+        return self._name if self._name is not None else self.__item__ and self.__item__.name or None
 
     def __contains__(self, name):
         return name in self.__names__
@@ -262,7 +268,7 @@ class Field(Node):
         :param missing: action to be performed when the value is ``Undefined`` and therefor missing
 
         """
-        super(Field, self).__init__()
+        super(Field, self).__init__(**kwargs)
 
         if validator is not None:
             setattr(self, "_validator", validator)

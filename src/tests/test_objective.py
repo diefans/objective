@@ -631,3 +631,55 @@ def test_chain(value, result):
     )
 
     assert v(None, value) == result
+
+
+def test_list_items_error():
+    import objective
+    import six
+
+    class Bar(objective.Mapping):
+        x = objective.Item(objective.Unicode)
+        y = objective.Item(objective.Unicode)
+
+    class Foo(objective.Mapping):
+
+        @objective.Item(missing=objective.Ignore)
+        class bar(objective.List):
+            items = objective.Item(Bar)
+
+        @objective.Item(missing=objective.Ignore)
+        class baz(objective.List):
+            @objective.Item()
+            class items(objective.Mapping):
+                x = objective.Item(objective.Unicode)
+                y = objective.Item(objective.Unicode)
+
+    value = {
+        'body': {
+            'bar': [{'x': 'a', 'y': 'b'}, {}],
+            'baz': [{}],
+        }
+    }
+
+    class Request(objective.BunchMapping):
+        body = objective.Item(Foo)
+
+    request = Request()
+
+    with pytest.raises(objective.Invalid) as err:
+        request.deserialize(value)
+
+    errors = {path: invalid.message
+              for path, invalid in six.iteritems(err.value.error_dict())}
+
+    assert errors == {
+        ('body',): 'Invalid value for `body`: <Undefined>',
+        ('body', 'bar'): 'Invalid value for `bar`: <Undefined>',
+        ('body', 'bar', 1): 'Invalid value for `1`: <Undefined>',
+        ('body', 'bar', 1, 'x'): 'Value for `x` is missing!',
+        ('body', 'bar', 1, 'y'): 'Value for `y` is missing!',
+        ('body', 'baz'): 'Invalid value for `baz`: <Undefined>',
+        ('body', 'baz', 0): 'Invalid value for `0`: <Undefined>',
+        ('body', 'baz', 0, 'x'): 'Value for `x` is missing!',
+        ('body', 'baz', 0, 'y'): 'Value for `y` is missing!'
+    }
