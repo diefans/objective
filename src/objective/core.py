@@ -71,7 +71,7 @@ class Item(object):
     """Remembers the order of :py:obj:`Item` instantiation."""
 
     def __new__(cls, *args, **kwargs):
-        inst = super(Item, cls).__new__(cls, *args, **kwargs)
+        inst = super(Item, cls).__new__(cls)
 
         cls.__items__.append(inst)
 
