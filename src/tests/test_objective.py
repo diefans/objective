@@ -683,3 +683,25 @@ def test_list_items_error():
         ('body', 'baz', 0, 'x'): 'Value for `x` is missing!',
         ('body', 'baz', 0, 'y'): 'Value for `y` is missing!'
     }
+
+
+class TestContainer:
+    def test_int_is_no_list(self):
+        import objective
+
+        class Foo(objective.List):
+            items = objective.Item(objective.Field)
+
+        foo = Foo()
+        with pytest.raises(objective.Invalid) as e:
+            d = foo.deserialize(1)
+
+    def test_list_is_no_dict(self):
+        import objective
+
+        class Foo(objective.Mapping):
+            bar = objective.Item(objective.Field)
+
+        foo = Foo()
+        with pytest.raises(objective.Invalid) as e:
+            d = foo.deserialize([])
