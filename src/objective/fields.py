@@ -1,5 +1,10 @@
 from datetime import datetime
-from collections import OrderedDict, abc
+from collections import OrderedDict
+try:
+    from collections.abc import Collection as CollectionABC, Mapping as MappingABC
+except ImportError:
+    from collections import Sequence as CollectionABC, Mapping as MappingABC
+
 
 import six
 
@@ -38,7 +43,7 @@ class CollectionMixin(object):
     def _deserialize(self, value, environment=None):
         """A collection traverses over something to deserialize its value."""
 
-        if not isinstance(value, abc.Collection):
+        if not isinstance(value, CollectionABC):
             raise exc.Invalid(self)
 
         items_class = self.items.__class__
@@ -123,7 +128,7 @@ class Mapping(core.Field):
         :param value: a ``dict`` wich contains mapped values
         """
 
-        if not isinstance(value, abc.Mapping):
+        if not isinstance(value, MappingABC):
             raise exc.Invalid(self)
 
         # traverse items and match against validated struct
